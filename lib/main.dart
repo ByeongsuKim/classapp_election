@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math';
 
+// auto_size_text 패키지 import
+import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -19,7 +21,6 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: '우리반 반장 선거',
       theme: ThemeData(
-        // 앱의 기본 폰트를 나눔스퀘어 Neo로 설정
         fontFamily: 'NanumSquareNeo',
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
@@ -38,15 +39,13 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage> {
   int _columnCount = 1;
-  String _voteDisplayOption = '선택 보이게'; // 사용자 요청에 따라 값 변경
+  String _voteDisplayOption = '(터치) 선택 보이게';
   String _votePolicyOption = '미투표 시 기권 처리';
   int _voteCount = 20;
 
-  final TextEditingController _electionTitleController =
-  TextEditingController();
+  final TextEditingController _electionTitleController = TextEditingController();
   String _electionTitle = '';
-  final TextEditingController _numberController =
-  TextEditingController(text: '20');
+  final TextEditingController _numberController = TextEditingController(text: '20');
   final List<TextEditingController> _candidateControllers = [];
   final List<FocusNode> _candidateFocusNodes = [];
 
@@ -150,12 +149,9 @@ class _MainPageState extends State<MainPage> {
 
         _candidateColumns = List.generate(
             _columnCount,
-                (index) => index < _candidateColumns.length
-                ? _candidateColumns[index]
-                : []);
+                (index) => index < _candidateColumns.length ? _candidateColumns[index] : []);
 
-        _candidateButtonColors =
-            List.generate(_columnCount, (index) => _fixedButtonColors[index]);
+        _candidateButtonColors = List.generate(_columnCount, (index) => _fixedButtonColors[index]);
       });
     }
   }
@@ -182,8 +178,7 @@ class _MainPageState extends State<MainPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        titleTextStyle: const TextStyle(
-            fontWeight: FontWeight.bold, color: Colors.black, fontSize: 20),
+        titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 20),
         contentTextStyle: const TextStyle(fontSize: 16),
         title: const Text('투표제 변경'),
         content: const Text('입력된 설명과 후보자 정보가 삭제될 수 있습니다. 계속하시겠습니까?'),
@@ -207,7 +202,7 @@ class _MainPageState extends State<MainPage> {
 
   void _showVoteDisplayChangeDialog(String selectedOption) {
     String message;
-    if (selectedOption == '선택 보이게') {
+    if (selectedOption.contains('보이게')) {
       message = "투표자가 후보자 이름을 터치(클릭)할 때 누구를 선택했는지 화면에 표시됩니다.";
     } else {
       message = "투표자가 후보자 이름을 터치(클릭)할 때 누구를 선택했는지 화면에 표시되지 않습니다.";
@@ -216,8 +211,7 @@ class _MainPageState extends State<MainPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        titleTextStyle: const TextStyle(
-            fontWeight: FontWeight.bold, color: Colors.black, fontSize: 20),
+        titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 20),
         contentTextStyle: const TextStyle(fontSize: 16),
         title: Text('\'$selectedOption\' 안내'),
         content: Text(message),
@@ -267,8 +261,7 @@ class _MainPageState extends State<MainPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        titleTextStyle: const TextStyle(
-            fontWeight: FontWeight.bold, color: Colors.black, fontSize: 20),
+        titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 20),
         title: const Text('후보 등록'),
         content: TextField(
           controller: controller,
@@ -277,29 +270,70 @@ class _MainPageState extends State<MainPage> {
           onSubmitted: (value) {
             if (value.isNotEmpty) {
               setState(() {
-                _candidateColumns[columnIndex]
-                    .add(TextEditingController(text: value));
+                _candidateColumns[columnIndex].add(TextEditingController(text: value));
               });
             }
             Navigator.of(context).pop();
           },
         ),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('취소')),
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('취소')),
           TextButton(
             onPressed: () {
               final value = controller.text;
               if (value.isNotEmpty) {
                 setState(() {
-                  _candidateColumns[columnIndex]
-                      .add(TextEditingController(text: value));
+                  _candidateColumns[columnIndex].add(TextEditingController(text: value));
                 });
               }
               Navigator.of(context).pop();
             },
             child: const Text('추가'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditCandidateDialog(int columnIndex, int candidateIndex) {
+    final controller = TextEditingController(text: _candidateColumns[columnIndex][candidateIndex].text);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 20),
+        title: const Text('후보 수정'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '후보 이름을 입력하세요'),
+          onSubmitted: (value) {
+            setState(() {
+              _candidateColumns[columnIndex][candidateIndex].text = value;
+            });
+            Navigator.of(context).pop();
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              _removeCandidate(columnIndex, candidateIndex);
+              Navigator.of(context).pop();
+            },
+            child: const Text('삭제', style: TextStyle(color: Colors.red)),
+          ),
+          const Spacer(),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _candidateColumns[columnIndex][candidateIndex].text = controller.text;
+              });
+              Navigator.of(context).pop();
+            },
+            child: const Text('확인'),
           ),
         ],
       ),
@@ -315,8 +349,7 @@ class _MainPageState extends State<MainPage> {
     };
 
     String currentText = _descriptionColumns[columnIndex].first.text;
-    String exampleText = (exampleTexts[_columnCount] ?? ['설명 등록'])[
-    columnIndex % (exampleTexts[_columnCount]?.length ?? 1)];
+    String exampleText = (exampleTexts[_columnCount] ?? ['설명 등록'])[columnIndex % (exampleTexts[_columnCount]?.length ?? 1)];
     String buttonText = currentText.isNotEmpty ? currentText : exampleText;
 
     if (_columnCount >= 3 && currentText.isEmpty) {
@@ -333,16 +366,12 @@ class _MainPageState extends State<MainPage> {
           child: Container(
             width: double.infinity,
             margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.symmetric(
-                vertical: 12, horizontal: 28), // X 버튼 공간 확보
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 28),
             decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[300]!)),
+                color: Colors.grey[200], borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey[300]!)),
             child: Text(
               buttonText,
-              style: const TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.normal),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
             ),
@@ -375,13 +404,11 @@ class _MainPageState extends State<MainPage> {
   }
 
   void _showEditDescriptionDialog(int columnIndex) {
-    final controller =
-    TextEditingController(text: _descriptionColumns[columnIndex].first.text);
+    final controller = TextEditingController(text: _descriptionColumns[columnIndex].first.text);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        titleTextStyle: const TextStyle(
-            fontWeight: FontWeight.bold, color: Colors.black, fontSize: 20),
+        titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 20),
         title: const Text('설명 수정'),
         content: TextField(
           controller: controller,
@@ -398,7 +425,7 @@ class _MainPageState extends State<MainPage> {
           TextButton(
             onPressed: () {
               setState(() {
-                _descriptionColumns[columnIndex].first.clear(); // 텍스트 초기화
+                _descriptionColumns[columnIndex].first.clear();
               });
               Navigator.of(context).pop();
             },
@@ -416,272 +443,152 @@ class _MainPageState extends State<MainPage> {
               });
               Navigator.of(context).pop();
             },
-            child: const Text('저장'),
+            child: const Text('확인'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCandidateButton(
-      TextEditingController controller, int columnIndex, int candidateIndex) {
-    final isEditing = ValueNotifier<bool>(false);
-    final focusNode = FocusNode();
-    final fontColor = _fixedFontColors[columnIndex];
-
-    focusNode.addListener(() {
-      if (!focusNode.hasFocus) {
-        isEditing.value = false;
-      }
-    });
-
-    final buttonContent = Container(
-      margin: const EdgeInsets.all(18.0),
-      decoration: BoxDecoration(
-        color: _candidateButtonColors[columnIndex],
-        borderRadius: BorderRadius.circular(12.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 2),
-          )
-        ],
-      ),
-      child: InkWell(
-        onTap: () {
-          isEditing.value = true;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            focusNode.requestFocus();
-            controller.selection = TextSelection(
-                baseOffset: 0, extentOffset: controller.text.length);
-          });
-        },
-        child: Stack(
-          children: [
-            LayoutBuilder(
-              builder: (BuildContext context, BoxConstraints constraints) {
-                double fontSize = constraints.maxHeight * 0.4;
-
-                // 폰트 크기 조절 로직 (사용자 요청 반영)
-                if (_columnCount == 1) {
-                  if (fontSize < 35) fontSize = 35;
-                } else if (_columnCount == 2) {
-                  if (fontSize < 30) fontSize = 30;
-                } else if (_columnCount == 3) {
-                  fontSize = 25;
-                } else if (_columnCount == 4) {
-                  fontSize = 22;
-                }
-
-                return Center(
-                  child: ValueListenableBuilder<bool>(
-                    valueListenable: isEditing,
-                    builder: (context, editing, child) {
-                      return Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: editing
-                            ? TextField(
-                          controller: controller,
-                          focusNode: focusNode,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              fontSize: fontSize,
-                              fontWeight: FontWeight.bold,
-                              color: fontColor),
-                          decoration: const InputDecoration(
-                              border: InputBorder.none),
-                          onSubmitted: (_) => isEditing.value = false,
-                        )
-                            : Text(
-                          controller.text.isEmpty
-                              ? '후보'
-                              : controller.text,
-                          style: TextStyle(
-                              fontSize: fontSize,
-                              fontWeight: FontWeight.bold,
-                              color: fontColor),
-                          textAlign: TextAlign.center,
-                          overflow: TextOverflow.fade,
-                          softWrap: false,
-                        ),
-                      );
-                    },
-                  ),
-                );
-              },
-            ),
-            Positioned(
-              top: 4,
-              right: 4,
-              child: Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.3),
-                  shape: BoxShape.circle,
+  Widget _buildCandidateButtonForMain(int columnIndex, int candidateIndex) {
+    return Container(
+      margin: const EdgeInsets.all(12.0), // 번호가 튀어나올 공간 확보를 위해 마진 조정
+      child: Stack(
+        clipBehavior: Clip.none, // 핵심: 번호가 버튼 영역 밖으로 나가도 보이게 설정
+        alignment: Alignment.center,
+        children: [
+          // 배경 및 버튼 본체
+          Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: BoxDecoration(
+              color: _candidateButtonColors[columnIndex],
+              borderRadius: BorderRadius.circular(12.0),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 3,
+                  offset: const Offset(0, 2),
                 ),
-                child: IconButton(
-                  padding: EdgeInsets.zero,
-                  iconSize: 16,
-                  icon: const Icon(Icons.close, color: Colors.white),
-                  onPressed: () =>
-                      _removeCandidate(columnIndex, candidateIndex),
+              ],
+            ),
+            child: InkWell(
+              onTap: () => _showEditCandidateDialog(columnIndex, candidateIndex),
+              borderRadius: BorderRadius.circular(12.0),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: AutoSizeText(
+                    _candidateColumns[columnIndex][candidateIndex].text,
+                    style: TextStyle(
+                      fontSize: 80, // 핵심: 기본 크기를 매우 크게 설정 (이전보다 약 8배)
+                      fontWeight: FontWeight.bold,
+                      color: _fixedFontColors[columnIndex],
+                    ),
+                    maxLines: 1, // 한 줄로 강제
+                    minFontSize: 12,
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
+          ),
 
-    if (_columnCount != 1) {
-      return AspectRatio(
-        aspectRatio: 1 / 1,
-        child: buttonContent,
-      );
-    }
-
-    return buttonContent;
-  }
-
-  Widget _buildCandidateLayout(int columnIndex, BoxConstraints constraints) {
-    final candidates = _candidateColumns[columnIndex];
-    final totalCandidates = candidates.length;
-
-    if (totalCandidates == 0) {
-      return const SizedBox.shrink();
-    }
-
-    if (_columnCount == 1) {
-      if (totalCandidates <= 2) {
-        if (totalCandidates == 1) {
-          return Center(
-            child: FractionallySizedBox(
-              widthFactor: 0.5,
-              heightFactor: 0.5,
-              child: _buildCandidateButton(candidates.first, columnIndex, 0),
-            ),
-          );
-        } else {
-          return Center(
-            child: FractionallySizedBox(
-              heightFactor: 0.5,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child:
-                    _buildCandidateButton(candidates[0], columnIndex, 0),
-                  ),
-                  Expanded(
-                    child:
-                    _buildCandidateButton(candidates[1], columnIndex, 1),
+          // --- 후보자 번호 (좌측 상단 바깥쪽 위치) ---
+          Positioned(
+            left: -10, // 버튼 영역 밖으로 이동
+            top: -10, // 버튼 영역 밖으로 이동
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: Colors.black, width: 2.0),
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 4,
+                    offset: const Offset(1, 1),
                   ),
                 ],
               ),
-            ),
-          );
-        }
-      }
-
-      List<Widget> rows = [];
-      List<int> candidatesPerRow;
-      int maxItemsInRow;
-
-      if (totalCandidates == 3) {
-        return Center(
-          child: FractionallySizedBox(
-            heightFactor: 0.5,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: List.generate(
-                  totalCandidates,
-                      (index) => Expanded(
-                    child: _buildCandidateButton(
-                        candidates[index], columnIndex, index),
-                  )),
+              child: Center(
+                child: Text(
+                  '${candidateIndex + 1}',
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
             ),
           ),
-        );
-      } else if (totalCandidates == 4) {
-        candidatesPerRow = [2, 2];
-        maxItemsInRow = 2;
-      } else if (totalCandidates == 5) {
-        candidatesPerRow = [2, 3];
-        maxItemsInRow = 3;
-      } else if (totalCandidates == 6) {
-        candidatesPerRow = [3, 3];
-        maxItemsInRow = 3;
-      } else if (totalCandidates == 7) {
-        candidatesPerRow = [3, 4];
-        maxItemsInRow = 4;
-      } else if (totalCandidates == 8) {
-        candidatesPerRow = [4, 4];
-        maxItemsInRow = 4;
-      } else {
-        int baseCount = (totalCandidates / 3).ceil();
-        maxItemsInRow = baseCount;
-        candidatesPerRow = [];
-        int remaining = totalCandidates;
-        while (remaining > 0) {
-          int count = remaining >= baseCount ? baseCount : remaining;
-          candidatesPerRow.add(count);
-          remaining -= count;
-        }
-      }
 
-      int candidateIndex = 0;
-      for (int count in candidatesPerRow) {
-        List<Widget> buttonsInRow = [];
-        for (int i = 0; i < count; i++) {
-          if (candidateIndex < totalCandidates) {
-            buttonsInRow.add(Expanded(
-              child: _buildCandidateButton(
-                  candidates[candidateIndex], columnIndex, candidateIndex),
-            ));
-            candidateIndex++;
-          }
-        }
-
-        if (count < maxItemsInRow) {
-          int diff = maxItemsInRow - count;
-          for (int i = 0; i < diff; i++) {
-            if (i.isEven) {
-              buttonsInRow.add(Expanded(child: Container()));
-            } else {
-              buttonsInRow.insert(0, Expanded(child: Container()));
-            }
-          }
-        }
-        rows.add(
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: buttonsInRow,
+          // --- 삭제 버튼 ---
+          Positioned(
+            right: 4,
+            top: 4,
+            child: IconButton(
+              iconSize: 20,
+              visualDensity: VisualDensity.compact,
+              icon: Icon(
+                Icons.close,
+                color: _fixedFontColors[columnIndex].withOpacity(0.8),
+              ),
+              onPressed: () => _removeCandidate(columnIndex, candidateIndex),
             ),
           ),
-        );
-      }
-      return Column(children: rows);
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCandidateLayout(int columnIndex) {
+    final int totalCandidates = _candidateColumns[columnIndex].length;
+
+    if (totalCandidates == 0) {
+      return Center(
+        child: OutlinedButton.icon(
+          icon: const Icon(Icons.add),
+          label: const Text('후보 추가'),
+          onPressed: () => _showAddCandidateDialog(columnIndex),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.grey[600],
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            side: BorderSide(color: Colors.grey[300]!),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+      );
     }
-    // 1인 2, 3, 4투표제일 때의 레이아웃 로직 (정사각형 버튼 유지)
-    else {
+
+    Widget layout;
+
+    if (_columnCount > 1) {
       List<Widget> children = [];
       for (int i = 0; i < totalCandidates; i += 2) {
         List<Widget> buttonsInRow = [];
         buttonsInRow.add(
           Expanded(
-            child: _buildCandidateButton(candidates[i], columnIndex, i),
+            child: AspectRatio(
+              aspectRatio: 1.5 / 1, // 번호가 잘 보일 수 있도록 비율 조정
+              child: _buildCandidateButtonForMain(columnIndex, i),
+            ),
           ),
         );
 
         if (i + 1 < totalCandidates) {
           buttonsInRow.add(
             Expanded(
-              child: _buildCandidateButton(
-                  candidates[i + 1], columnIndex, i + 1),
+              child: AspectRatio(
+                aspectRatio: 1.5 / 1,
+                child: _buildCandidateButtonForMain(columnIndex, i + 1),
+              ),
             ),
           );
         } else {
@@ -695,338 +602,384 @@ class _MainPageState extends State<MainPage> {
           children.add(Expanded(child: Container()));
         }
       }
-      return Column(children: children);
-    }
-  }
-
-  Widget _buildMainContent() {
-    return Expanded(
-      child: Row(
-        children: List.generate(_columnCount, (columnIndex) {
-          return Expanded(
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(20.0, 5.0, 20.0, 20.0),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12.0),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    spreadRadius: 2,
-                    blurRadius: 5,
-                    offset: const Offset(0, 3),
-                  )
-                ],
-              ),
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildDescriptionItem(columnIndex),
-                        const SizedBox(height: 8),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.person_add,
-                              color: Colors.white, size: 16),
-                          label:
-                          const Text("후보 등록", style: TextStyle(fontSize: 12)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue[700],
-                            foregroundColor: Colors.white,
-                            textStyle:
-                            const TextStyle(fontWeight: FontWeight.bold),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding:
-                            const EdgeInsets.symmetric(horizontal: 8),
-                          ),
-                          onPressed: () => _showAddCandidateDialog(columnIndex),
-                        ),
-                      ],
-                    ),
+      layout = Column(children: children);
+    } else {
+      if (totalCandidates <= 3) {
+        if (totalCandidates == 1) {
+          layout = Center(
+            child: FractionallySizedBox(
+              widthFactor: 0.6,
+              heightFactor: 0.4,
+              child: _buildCandidateButtonForMain(columnIndex, 0),
+            ),
+          );
+        } else {
+          layout = Center(
+            child: FractionallySizedBox(
+              heightFactor: 0.4,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: List.generate(
+                  totalCandidates,
+                      (j) => Expanded(
+                    child: _buildCandidateButtonForMain(columnIndex, j),
                   ),
-                  const Divider(height: 1, thickness: 1),
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        return _buildCandidateLayout(columnIndex, constraints);
-                      },
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           );
-        }),
+        }
+      } else {
+        List<Widget> rows = [];
+        List<int> candidatesPerRow;
+        int maxItemsInRow = 0;
+
+        if (totalCandidates == 4) {
+          candidatesPerRow = [2, 2];
+          maxItemsInRow = 2;
+        } else if (totalCandidates == 5) {
+          candidatesPerRow = [2, 3];
+          maxItemsInRow = 3;
+        } else if (totalCandidates == 6) {
+          candidatesPerRow = [3, 3];
+          maxItemsInRow = 3;
+        } else if (totalCandidates == 7) {
+          candidatesPerRow = [3, 4];
+          maxItemsInRow = 4;
+        } else if (totalCandidates == 8) {
+          candidatesPerRow = [4, 4];
+          maxItemsInRow = 4;
+        } else {
+          int baseCount = (totalCandidates / 3).ceil();
+          if (baseCount == 0) baseCount = 1;
+          maxItemsInRow = baseCount;
+          candidatesPerRow = [];
+          int remaining = totalCandidates;
+          while (remaining > 0) {
+            int count = remaining >= baseCount ? baseCount : remaining;
+            candidatesPerRow.add(count);
+            remaining -= count;
+          }
+        }
+
+        int candidateIndex = 0;
+        for (int count in candidatesPerRow) {
+          List<Widget> buttonsInRow = [];
+          for (int i = 0; i < count; i++) {
+            if (candidateIndex < totalCandidates) {
+              buttonsInRow.add(
+                Expanded(
+                  child: _buildCandidateButtonForMain(columnIndex, candidateIndex),
+                ),
+              );
+              candidateIndex++;
+            }
+          }
+
+          if (count < maxItemsInRow) {
+            int diff = maxItemsInRow - count;
+            for (int i = 0; i < diff; i++) {
+              if (i.isEven) {
+                buttonsInRow.add(Expanded(child: Container()));
+              } else {
+                buttonsInRow.insert(0, Expanded(child: Container()));
+              }
+            }
+          }
+
+          rows.add(
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: buttonsInRow,
+              ),
+            ),
+          );
+        }
+        layout = Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: rows,
+          ),
+        );
+      }
+    }
+
+    return Column(
+      children: [
+        Expanded(child: layout),
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.add),
+              label: const Text('후보 추가'),
+              onPressed: () => _showAddCandidateDialog(columnIndex),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.grey[600],
+                side: BorderSide(color: Colors.grey[300]!),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildColumnSection(int columnIndex) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.all(8.0),
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 2,
+              blurRadius: 5,
+              offset: const Offset(0, 3),
+            )
+          ],
+        ),
+        child: Column(
+          children: [
+            _buildDescriptionItem(columnIndex),
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 16),
+            Expanded(
+              child: _buildCandidateLayout(columnIndex),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        FocusScope.of(context).unfocus();
-      },
-      child: Scaffold(
-        backgroundColor: const Color(0xFFFFD740),
-        body: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              Container(
-                color: const Color(0xFFFFD740),
-                padding:
-                EdgeInsets.only(top: MediaQuery.of(context).padding.top),
-                child: SizedBox(
-                  height: 64,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        const SizedBox(width: 16.0),
-                        Container(
-                          height: 48,
-                          padding:
-                          const EdgeInsets.symmetric(horizontal: 12.0),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8.0),
-                          ),
-                          child: DropdownButton<int>(
-                            value: _columnCount,
-                            underline: Container(),
-                            items: {
-                              1: '1인 1투표제',
-                              2: '1인 2투표제',
-                              3: '1인 3투표제',
-                              4: '1인 4투표제',
-                            }
-                                .entries
-                                .map((entry) => DropdownMenuItem(
-                              value: entry.key,
-                              child: Text(entry.value),
-                            ))
-                                .toList(),
-                            onChanged: (value) {
-                              if (value != null) {
-                                _updateColumns(value);
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Container(
-                          height: 48,
-                          padding:
-                          const EdgeInsets.symmetric(horizontal: 12.0),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8.0),
-                          ),
-                          child: DropdownButton<String>(
-                            value: _voteDisplayOption,
-                            underline: Container(),
-                            items: ['선택 보이게', '선택 안보이게']
-                                .map((option) => DropdownMenuItem(
-                              value: option,
-                              child: Text(option),
-                            ))
-                                .toList(),
-                            onChanged: (value) {
-                              if (value != null) {
-                                setState(() => _voteDisplayOption = value);
-                                _showVoteDisplayChangeDialog(value);
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Container(
-                          height: 48,
-                          padding:
-                          const EdgeInsets.symmetric(horizontal: 12.0),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8.0),
-                          ),
-                          child: DropdownButton<String>(
-                            value: _votePolicyOption,
-                            underline: Container(),
-                            items: ['미투표 시 기권 처리', '꼭 투표해야 함']
-                                .map((option) => DropdownMenuItem(
-                              value: option,
-                              child: Text(option),
-                            ))
-                                .toList(),
-                            onChanged: (value) {
-                              if (value != null) {
-                                setState(() => _votePolicyOption = value);
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 24),
-                        const Text("총 투표권자 수",
-                            style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold)),
-                        const SizedBox(width: 4),
-                        SizedBox(
-                          height: 48,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.deepOrange,
-                              borderRadius: BorderRadius.circular(8.0),
-                            ),
-                            child: Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.remove,
-                                      color: Colors.white, size: 16),
-                                  onPressed: () => setState(() {
-                                    if (_voteCount > 1) {
-                                      _voteCount--;
-                                      _numberController.text =
-                                          _voteCount.toString();
-                                    }
-                                  }),
-                                ),
-                                SizedBox(
-                                  width: 30,
-                                  child: TextField(
-                                    controller: _numberController,
-                                    textAlign: TextAlign.center,
-                                    keyboardType: TextInputType.number,
-                                    style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold),
-                                    decoration: const InputDecoration(
-                                        border: InputBorder.none,
-                                        contentPadding: EdgeInsets.zero),
-                                    onChanged: (value) => _voteCount =
-                                        int.tryParse(value) ?? _voteCount,
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.add,
-                                      color: Colors.white, size: 16),
-                                  onPressed: () => setState(() {
-                                    _voteCount++;
-                                    _numberController.text =
-                                        _voteCount.toString();
-                                  }),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          height: 48,
-                          child: FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: const Color(0xFF134686),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                            ),
-                            onPressed: () {
-                              if (!_hasCandidateData()) {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    titleTextStyle: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black,
-                                        fontSize: 20),
-                                    contentTextStyle:
-                                    const TextStyle(fontSize: 16),
-                                    title: const Text('알림'),
-                                    content:
-                                    const Text('후보자가 등록되지 않았습니다.'),
-                                    actions: [
-                                      TextButton(
-                                          onPressed: () =>
-                                              Navigator.of(context).pop(),
-                                          child: const Text('확인'))
-                                    ],
-                                  ),
-                                );
-                                return;
-                              }
-                              final List<List<String>> descriptions =
-                              _descriptionColumns
-                                  .map((col) => col
-                                  .map((item) => item.text)
-                                  .where((t) => t.isNotEmpty)
-                                  .toList())
-                                  .toList();
-                              final List<List<String>> candi =
-                              _candidateColumns
-                                  .map((col) => col
-                                  .map((item) => item.text)
-                                  .where((t) => t.isNotEmpty)
-                                  .toList())
-                                  .toList();
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ElectionPage(
-                                    electionTitle: _electionTitle,
-                                    voterCount: _voteCount,
-                                    descriptions: descriptions,
-                                    candi: candi,
-                                    candidateButtonColors:
-                                    _candidateButtonColors,
-                                    voteDisplayOption: _voteDisplayOption, // 수정된 부분
-                                  ),
-                                ),
-                              );
-                            },
-                            child: const Text('투표 시작'),
-                          ),
-                        ),
-                        const SizedBox(width: 16.0),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF3F4F6),
+      appBar: AppBar(
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.white,
+        title: SizedBox(
+          width: 300,
+          child: TextField(
+            controller: _electionTitleController,
+            decoration: const InputDecoration(
+              hintText: '선거 제목을 입력하세요',
+              border: InputBorder.none,
+            ),
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+        ),
+        actions: [
+          Container(
+            width: 200,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  "총원: ",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.remove),
+                  onPressed: () {
+                    setState(() {
+                      _voteCount = (_voteCount > 0) ? _voteCount - 1 : 0;
+                      _numberController.text = _voteCount.toString();
+                    });
+                  },
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: _numberController,
+                    textAlign: TextAlign.center,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: <TextInputFormatter>[FilteringTextInputFormatter.digitsOnly],
+                    onChanged: (value) {
+                      setState(() {
+                        _voteCount = int.tryParse(value) ?? 0;
+                      });
+                    },
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: () {
+                    setState(() {
+                      _voteCount++;
+                      _numberController.text = _voteCount.toString();
+                    });
+                  },
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                const Text("명"),
+              ],
+            ),
+          ),
+          const SizedBox(width: 24),
+        ],
+        shape: const Border(
+          bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1),
+        ),
+      ),
+      body: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+            color: Colors.white,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Text('투표제 설정: ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 16),
+                    ToggleButtons(
+                      isSelected: [_columnCount == 1, _columnCount == 2, _columnCount == 3, _columnCount == 4],
+                      onPressed: (int index) {
+                        _updateColumns(index + 1);
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      children: const [
+                        Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('1인 1표')),
+                        Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('1인 2표')),
+                        Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('1인 3표')),
+                        Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('1인 4표')),
                       ],
                     ),
-                  ),
-                ),
-              ),
-              Container(
-                margin: const EdgeInsets.fromLTRB(20.0, 4.0, 20.0, 8.0),
-                padding: const EdgeInsets.symmetric(vertical: 12.0),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12.0),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      spreadRadius: 2,
-                      blurRadius: 5,
-                      offset: const Offset(0, 3),
-                    )
                   ],
                 ),
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: TextField(
-                      controller: _electionTitleController,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          fontSize: 24.0, fontWeight: FontWeight.bold),
-                      decoration: const InputDecoration.collapsed(
-                        hintText: '선거 제목을 입력하세요',
+                Row(
+                  children: [
+                    const Text('투표 방식 설정: ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(8.0),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _voteDisplayOption,
+                          onChanged: (String? newValue) {
+                            if (newValue != null) {
+                              setState(() {
+                                _voteDisplayOption = newValue;
+                              });
+                              _showVoteDisplayChangeDialog(newValue);
+                            }
+                          },
+                          items: <String>[
+                            '(키보드) 선택 안보이게',
+                            '(키보드) 선택 보이게',
+                            '(터치) 선택 안보이게',
+                            '(터치) 선택 보이게',
+                          ].map<DropdownMenuItem<String>>((String value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Text(value),
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFE5E7EB)),
+          Expanded(
+            child: Row(
+              children: List.generate(_columnCount, (index) {
+                return _buildColumnSection(index);
+              }),
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: Container(
+        height: 80,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFE5E7EB), width: 1)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('$_columnCount개의 선거 | 총 ${_candidateColumns.fold(0, (prev, col) => prev + col.length)}명의 후보',
+                  style: const TextStyle(color: Colors.grey)),
+              SizedBox(
+                height: 52,
+                child: FilledButton(
+                  onPressed: !_hasCandidateData()
+                      ? null
+                      : () {
+                    List<List<String>> descriptionTexts =
+                    _descriptionColumns.map((col) => col.map((c) => c.text).toList()).toList();
+                    List<List<String>> candiTexts = _candidateColumns.map((col) => col.map((c) => c.text).toList()).toList();
+
+                    List<List<int>> candiNumbers = [];
+                    for (int i = 0; i < _candidateColumns.length; i++) {
+                      List<int> numbersInCol = [];
+                      for (int j = 0; j < _candidateColumns[i].length; j++) {
+                        numbersInCol.add(j + 1); // 1부터 시작하는 번호
+                      }
+                      candiNumbers.add(numbersInCol);
+                    }
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ElectionPage(
+                          electionTitle: _electionTitleController.text,
+                          voterCount: _voteCount,
+                          descriptions: descriptionTexts,
+                          candi: candiTexts,
+                          candidateNumbers: candiNumbers,
+                          candidateButtonColors: _candidateButtonColors,
+                          voteDisplayOption: _voteDisplayOption.contains('보이게') ? '선택 보이게' : '선택 안보이게',
+                        ),
+                      ),
+                    );
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF134686),
+                    textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    padding: const EdgeInsets.symmetric(horizontal: 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
+                  child: const Text('투표 시작하기'),
                 ),
               ),
-              _buildMainContent(),
             ],
           ),
         ),
