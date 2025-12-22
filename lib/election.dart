@@ -1,4 +1,6 @@
 import 'dart:async';
+
+import 'package:auto_size_text/auto_size_text.dart'; // 패키지 import
 import 'package:flutter/material.dart';
 
 class ElectionPage extends StatefulWidget {
@@ -6,6 +8,7 @@ class ElectionPage extends StatefulWidget {
   final int voterCount;
   final List<List<String>> descriptions;
   final List<List<String>> candi;
+  final List<List<int>> candidateNumbers;
   final List<Color> candidateButtonColors;
   final String voteDisplayOption;
 
@@ -15,6 +18,7 @@ class ElectionPage extends StatefulWidget {
     required this.voterCount,
     required this.descriptions,
     required this.candi,
+    required this.candidateNumbers,
     required this.candidateButtonColors,
     required this.voteDisplayOption,
   });
@@ -65,6 +69,7 @@ class _ElectionPageState extends State<ElectionPage> {
       return List.generate(widget.candi[i].length, (j) {
         return _CandidateInfo(
           name: widget.candi[i][j],
+          number: widget.candidateNumbers[i][j],
           originalColumnIndex: i,
           originalCandidateIndex: j,
           color: widget.candidateButtonColors[i],
@@ -75,24 +80,29 @@ class _ElectionPageState extends State<ElectionPage> {
 
   void _vote(int columnIndex, int candidateIndex) {
     setState(() {
+      // 1인 1표 강제 로직: 해당 컬럼에서 다른 후보를 선택하면 기존 표는 자동으로 취소됨
+      final currentVotes = voted[currentVoterIndex][columnIndex];
+      final currentlyVotedIndex = currentVotes.indexWhere((v) => v);
+
+      if (currentlyVotedIndex != -1 && currentlyVotedIndex != candidateIndex) {
+        // 기존에 투표한 후보가 있고, 다른 후보를 선택했다면
+        currentVotes[currentlyVotedIndex] = false; // 기존 투표 취소
+        voteCounts[columnIndex][currentlyVotedIndex]--; // 기존 득표 수 감소
+      }
+
+      // 현재 선택한 후보에 대한 투표 처리
+      if (currentVotes[candidateIndex]) {
+        // 이미 선택된 후보를 다시 누르면 투표 취소
+        currentVotes[candidateIndex] = false;
+        voteCounts[columnIndex][candidateIndex]--;
+      } else {
+        // 새로운 후보 선택
+        currentVotes[candidateIndex] = true;
+        voteCounts[columnIndex][candidateIndex]++;
+      }
+
+      // '선택 안보이게' 옵션일 때 시각 효과 처리
       if (widget.voteDisplayOption != '선택 보이게') {
-        final currentVotes = voted[currentVoterIndex][columnIndex];
-        final currentlyVotedIndex = currentVotes.indexWhere((v) => v);
-
-        if (currentlyVotedIndex != candidateIndex) {
-          for (int i = 0; i < currentVotes.length; i++) {
-            if (currentVotes[i]) {
-              currentVotes[i] = false;
-              voteCounts[columnIndex][i]--;
-            }
-          }
-          currentVotes[candidateIndex] = true;
-          voteCounts[columnIndex][candidateIndex]++;
-        } else {
-          currentVotes[candidateIndex] = false;
-          voteCounts[columnIndex][candidateIndex]--;
-        }
-
         _showUniversalSelectionEffect = true;
         _effectTimer?.cancel();
         _effectTimer = Timer(const Duration(milliseconds: 200), () {
@@ -100,22 +110,10 @@ class _ElectionPageState extends State<ElectionPage> {
             setState(() => _showUniversalSelectionEffect = false);
           }
         });
-      } else {
-        final currentVotes = voted[currentVoterIndex][columnIndex];
-        final currentlyVotedIndex = currentVotes.indexWhere((v) => v);
-
-        if (currentlyVotedIndex != candidateIndex) {
-          if (currentlyVotedIndex != -1) {
-            currentVotes[currentlyVotedIndex] = false;
-            voteCounts[columnIndex][currentlyVotedIndex]--;
-          }
-          currentVotes[candidateIndex] = true;
-          voteCounts[columnIndex][candidateIndex]++;
-        }
       }
     });
 
-    // 현재 유권자가 모든 column에서 투표했는지 확인
+    // 모든 선거(column)에서 1표씩 투표했는지 확인
     bool allVoted = true;
     for (int i = 0; i < widget.candi.length; i++) {
       if (!voted[currentVoterIndex][i].contains(true)) {
@@ -124,13 +122,12 @@ class _ElectionPageState extends State<ElectionPage> {
       }
     }
 
-    // 모든 column에서 투표를 완료했다면 애니메이션 시작
+    // 모든 선거에서 투표를 완료했다면 '투표 완료' 버튼으로 시선 유도 애니메이션 시작
     if (allVoted) {
       _arrowAnimationTimer?.cancel();
       setState(() {
         _showArrowAnimation = true;
       });
-
       _arrowAnimationTimer = Timer(const Duration(seconds: 2), () {
         if (mounted) {
           setState(() {
@@ -340,41 +337,31 @@ class _ElectionPageState extends State<ElectionPage> {
       child: InkWell(
         onTap: () =>
             _vote(candidate.originalColumnIndex, candidate.originalCandidateIndex),
+        borderRadius: BorderRadius.circular(12.0),
         child: Stack(
           alignment: Alignment.center,
           children: [
+            // --- 후보자 이름 ---
             LayoutBuilder(
               builder: (BuildContext context, BoxConstraints constraints) {
-                double fontSize = constraints.maxHeight * 0.4;
-                int columnCount = widget.candi.length;
-
-                if (columnCount == 1) {
-                  if (fontSize < 35) fontSize = 35;
-                } else if (columnCount == 2) {
-                  if (fontSize < 30) fontSize = 30;
-                } else if (columnCount == 3) {
-                  fontSize = 25;
-                } else if (columnCount == 4) {
-                  fontSize = 22;
-                }
-
                 return Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Text(
+                    padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                    // [핵심 수정] AutoSizeText 위젯 사용
+                    child: AutoSizeText(
                       candidate.name,
                       style: TextStyle(
-                          fontSize: fontSize,
-                          fontWeight: FontWeight.bold,
-                          color: fontColor),
+                          fontWeight: FontWeight.bold, color: fontColor),
                       textAlign: TextAlign.center,
-                      overflow: TextOverflow.fade,
-                      softWrap: false,
+                      maxLines: 2, // 최대 2줄
+                      minFontSize: 15, // 최소 폰트 크기를 15로 설정
+                      overflow: TextOverflow.ellipsis, // 그래도 넘치면 ... 처리
                     ),
                   ),
                 );
               },
             ),
+            // --- 투표 수 (기존) ---
             if (widget.voteDisplayOption == '선택 보이게')
               Positioned(
                 bottom: 8,
@@ -387,6 +374,30 @@ class _ElectionPageState extends State<ElectionPage> {
                       color: fontColor.withOpacity(0.8)),
                 ),
               ),
+            // --- 후보자 번호 ---
+            Positioned(
+              left: 8,
+              top: 8,
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: Colors.black, width: 2.0),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Center(
+                  child: Text(
+                    '${candidate.number}',
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -533,186 +544,129 @@ class _ElectionPageState extends State<ElectionPage> {
 
   @override
   Widget build(BuildContext context) {
-    final topPadding = MediaQuery.of(context).padding.top;
-
     return Scaffold(
-      backgroundColor: const Color(0xFFFFD740),
-      body: Stack(
-        children: [
-          SafeArea(
-            top: false,
-            child: Column(
+      // 1. 배경색 통일
+      backgroundColor: const Color(0xFFF3F4F6),
+      // 2. AppBar 구조 통일
+      appBar: AppBar(
+        automaticallyImplyLeading: false, // 뒤로가기 버튼 숨김
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.white,
+        // AppBar 제목 영역
+        title: Text(
+          widget.electionTitle,
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          overflow: TextOverflow.ellipsis,
+        ),
+        // AppBar 액션 영역 (총원 표시)
+        actions: [
+          Container(
+            width: 200,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // 상단 바
-                Container(
-                  color: const Color(0xFFFFD740),
-                  padding: EdgeInsets.only(top: topPadding),
-                  child: SizedBox(
-                    height: 64,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Row(
-                        children: [
-                          // 왼쪽 영역
-                          Expanded(
-                            flex: 1,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              children: [
-                                Container(
-                                  height: 48,
-                                  padding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.deepOrange,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      '완료: $currentVoterIndex명',
-                                      style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  height: 48,
-                                  padding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blueGrey.withOpacity(0.8),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      '총원: ${widget.voterCount}명',
-                                      style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // 가운데 영역
-                          Expanded(
-                            flex: 2,
-                            child: Center(
-                              child: Text(
-                                '${currentVoterIndex + 1}번째 투표',
-                                style: const TextStyle(
-                                  color: Color(0xFF134686),
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                          // 오른쪽 영역
-                          Expanded(
-                            flex: 1,
-                            child: Align(
-                              alignment: Alignment.centerRight,
-                              child: SizedBox(
-                                height: 48,
-                                child: FilledButton(
-                                  onPressed: _onNextVoterPressed,
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: const Color(0xFF134686),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8)),
-                                  ),
-                                  child: const Text('나의 투표 완료'),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                const Text("완료: ", style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('$currentVoterIndex명', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                const Text(" / 총원: "),
+                Text('${widget.voterCount}명'),
+              ],
+            ),
+          ),
+          const SizedBox(width: 24),
+        ],
+        shape: const Border(
+          bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1),
+        ),
+      ),
+      body: Column(
+        children: [
+          // 3. 설정 Bar 영역 복제 (내용은 '투표 완료' 버튼으로 대체)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+            color: Colors.white,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${currentVoterIndex + 1}번째 투표',
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(
+                  height: 48,
+                  child: FilledButton.icon(
+                    icon: const Icon(Icons.how_to_vote),
+                    label: const Text('나의 투표 완료'),
+                    onPressed: _onNextVoterPressed,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF134686),
+                      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                  ),
-                ),
-                // 제목 영역
-                Container(
-                  margin: const EdgeInsets.fromLTRB(20.0, 8.0, 20.0, 8.0),
-                  padding: const EdgeInsets.symmetric(vertical: 12.0),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12.0),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
-                        spreadRadius: 2,
-                        blurRadius: 5,
-                        offset: const Offset(0, 3),
-                      )
-                    ],
-                  ),
-                  child: Center(
-                    child: Text(
-                      widget.electionTitle,
-                      style:
-                      const TextStyle(fontSize: 24.0, fontWeight: FontWeight.bold),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-                // 메인 콘텐츠 영역
-                Expanded(
-                  child: Row(
-                    children: List.generate(widget.candi.length, (columnIndex) {
-                      return Expanded(
-                        child: Container(
-                          margin:
-                          const EdgeInsets.fromLTRB(20.0, 5.0, 20.0, 20.0),
-                          decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12.0),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.08),
-                                  spreadRadius: 2,
-                                  blurRadius: 5,
-                                  offset: const Offset(0, 3),
-                                )
-                              ]),
-                          child: Column(
-                            children: [
-                              if (widget.descriptions[columnIndex].isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.all(12.0),
-                                  child: Text(
-                                    widget.descriptions[columnIndex].join(', '),
-                                    style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              Expanded(
-                                child: _buildCandidateLayout(columnIndex),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }),
                   ),
                 ),
               ],
             ),
           ),
-          // 화살표 애니메이션 위치
-          Visibility(
-            visible: _showArrowAnimation,
-            child: Positioned(
-              top: topPadding + (64 / 2) - 20,
-              right: 16.0 + 120.0,
-              child: const _BlinkingArrow(),
+          const Divider(height: 1, color: Color(0xFFE5E7EB)),
+          // 4. 메인 콘텐츠 영역 구조 통일
+          Expanded(
+            child: Stack(
+              children: [
+                Row(
+                  children: List.generate(widget.candi.length, (columnIndex) {
+                    return Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.all(8.0),
+                        padding: const EdgeInsets.all(16.0),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.1),
+                              spreadRadius: 2,
+                              blurRadius: 5,
+                              offset: const Offset(0, 3),
+                            )
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            if (widget.descriptions[columnIndex].isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.all(12.0),
+                                child: Text(
+                                  widget.descriptions[columnIndex].join(', '),
+                                  style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            Expanded(
+                              child: _buildCandidateLayout(columnIndex),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+                // '투표 완료' 버튼 위치로 시선 유도하는 화살표 애니메이션
+                if (_showArrowAnimation)
+                  Positioned(
+                    top: -10,
+                    right: 24,
+                    child: const _BlinkingArrow(),
+                  ),
+              ],
             ),
           ),
         ],
@@ -723,12 +677,14 @@ class _ElectionPageState extends State<ElectionPage> {
 
 class _CandidateInfo {
   final String name;
+  final int number;
   final int originalColumnIndex;
   final int originalCandidateIndex;
   final Color color;
 
   _CandidateInfo({
     required this.name,
+    required this.number,
     required this.originalColumnIndex,
     required this.originalCandidateIndex,
     required this.color,
@@ -913,10 +869,13 @@ class _BlinkingArrowState extends State<_BlinkingArrow>
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _controller,
-      child: Image.asset(
-        'assets/images/arrow.png',
-        width: 40.0,
-        height: 40.0,
+      child: Transform.rotate(
+        angle: -0.8, // 화살표 각도 조절
+        child: const Icon(
+          Icons.arrow_forward,
+          color: Colors.redAccent,
+          size: 60.0,
+        ),
       ),
     );
   }
