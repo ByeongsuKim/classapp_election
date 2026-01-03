@@ -52,6 +52,9 @@ class _MainPageState extends State<MainPage> {
   String _votePolicyOption = '미투표 시 기권 처리';
   int _voteCount = 20;
   bool _isVotingMode = false;
+  bool _isAnimating = false;
+  int _currentVoterIndex = 1; // 현재 투표 중인 학생 순서(1번부터 시작)
+  bool _showVoteAnimation = false; //1
 
   final TextEditingController _electionTitleController = TextEditingController();
   String _electionTitle = '';
@@ -191,7 +194,7 @@ class _MainPageState extends State<MainPage> {
         titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 20),
         contentTextStyle: const TextStyle(fontSize: 16),
         title: const Text('투표제 변경'),
-        content: const Text('입력된 설명과 후보자 정보가 삭제될 수 있습니다. 계속하시겠습니까?'),
+        content: const Text('입력된 설명과 후보자 정보가 삭제됩니다. 계속하시겠습니까?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -359,6 +362,28 @@ class _MainPageState extends State<MainPage> {
     };
 
     String currentText = _descriptionColumns[columnIndex].first.text;
+
+    // --- [추가] 투표 모드일 때의 UI 처리 ---
+    if (_isVotingMode) {
+      return Container(
+        width: double.infinity,
+        height: 48, // 기존 버튼의 높이와 일관성 유지
+        alignment: Alignment.center,
+        child: Text(
+          currentText, // 텍스트가 없으면 자동으로 빈 여백이 됨
+          style: const TextStyle(
+            fontSize: 18, // 투표 모드에서는 가독성을 위해 폰트를 키움
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+        ),
+      );
+    }
+    // ------------------------------------
+
+    // 편집 모드 (기존 로직 유지)
     String exampleText = (exampleTexts[_columnCount] ?? ['설명 등록'])[columnIndex % (exampleTexts[_columnCount]?.length ?? 1)];
     String buttonText = currentText.isNotEmpty ? currentText : exampleText;
 
@@ -378,7 +403,9 @@ class _MainPageState extends State<MainPage> {
             margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 28),
             decoration: BoxDecoration(
-                color: Colors.grey[200], borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey[300]!)),
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!)),
             child: Text(
               buttonText,
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
@@ -412,6 +439,7 @@ class _MainPageState extends State<MainPage> {
       ],
     );
   }
+
 
   void _showEditDescriptionDialog(int columnIndex) {
     final controller = TextEditingController(text: _descriptionColumns[columnIndex].first.text);
@@ -526,6 +554,12 @@ class _MainPageState extends State<MainPage> {
 
 
   Widget _buildColumnSection(int columnIndex) {
+    // 1. 현재 모든 단의 총 후보자 수 미리 계산
+    int totalCandidates = _candidateColumns.fold(0, (sum, col) => sum + col.length);
+
+    // 2. 특수 레이아웃 조건 판별
+    bool isSpecialSingleLayout = (_columnCount == 1 && totalCandidates == 1);
+
     return Expanded(
       child: Container(
         margin: const EdgeInsets.all(8.0),
@@ -549,7 +583,21 @@ class _MainPageState extends State<MainPage> {
             const Divider(),
             const SizedBox(height: 16),
             Expanded(
-              child: _buildCandidateLayout(columnIndex),
+              // Row 구조를 고정하여 엔진 충돌 방지
+              child: Row(
+                children: [
+                  // 조건에 따라 왼쪽 Spacer 활성화
+                  if (isSpecialSingleLayout) const Spacer(flex: 25),
+
+                  Expanded(
+                    flex: isSpecialSingleLayout ? 50 : 100,
+                    child: _buildCandidateLayout(columnIndex),
+                  ),
+
+                  // 조건에 따라 오른쪽 Spacer 활성화
+                  if (isSpecialSingleLayout) const Spacer(flex: 25),
+                ],
+              ),
             ),
           ],
         ),
@@ -564,105 +612,197 @@ class _MainPageState extends State<MainPage> {
         defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.linux ||
         defaultTargetPlatform == TargetPlatform.macOS;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
-
-// ... (기존 코드 생략) ...
-      body: Column(
+      // Stack을 사용하여 기존 UI 위에 애니메이션 레이어를 겹침
+      body: Stack(
         children: [
-          // --- [1번째 줄] 설정 메뉴 영역 (투표제 & 투표 방식) ---
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
-            color: Colors.white,
-            height: 60,
-            child: Center(
-              child: _isVotingMode
-                  ? Text(
-                _electionTitleController.text,
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0,
-                ),
-                textAlign: TextAlign.center,
-              )
-                  : IntrinsicWidth( // TextField가 가로를 꽉 채우지 않고 내용만큼만 차지하게 함
-                child: TextField(
-                  controller: _electionTitleController,
-                  textAlign: TextAlign.center,
-                  cursorWidth: 0, // 커서 너비를 제거하여 텍스트 시작점 정렬 맞춤
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                    isCollapsed: true, // 내부 여백을 더 강력하게 압축
+          // 1. 메인 UI 레이어 (기존 Column 구조)
+          Column(
+            children: [
+              // --- [1번째 줄] 설정 메뉴 영역 (투표제 & 투표 방식) ---
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+                color: Colors.white,
+                height: 60,
+                child: Center(
+                  child: _isVotingMode
+                      ? Text(
+                    _electionTitleController.text,
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0,
+                    ),
+                    textAlign: TextAlign.center,
+                  )
+                      : IntrinsicWidth(
+                    child: TextField(
+                      controller: _electionTitleController,
+                      textAlign: TextAlign.center,
+                      cursorWidth: 0,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                        isCollapsed: true,
+                      ),
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0,
+                      ),
+                    ),
                   ),
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0,
+                ),
+              ),
+              const Divider(height: 1, color: Color(0xFFE5E7EB)),
+
+              // --- [3번째 줄 이하] 후보자 영역 ---
+              Expanded(
+                child: Row(
+                  children: List.generate(_columnCount, (index) {
+                    return _buildColumnSection(index);
+                  }),
+                ),
+              ),
+            ],
+          ),
+
+          // 2. 투표 시작 애니메이션 레이어 (오버레이)
+          if (_isAnimating)
+            Positioned.fill(
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 500),
+                opacity: _isAnimating ? 1.0 : 0.0,
+                child: Container(
+                  color: const Color(0xFF134686).withOpacity(0.95), // 배경색
+                  child: const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.how_to_vote, size: 100, color: Colors.white),
+                        SizedBox(height: 20),
+                        Text(
+                          "투표가 시작됩니다",
+                          style: TextStyle(
+                            fontSize: 40,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                        SizedBox(height: 20),
+                        CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          const Divider(height: 1, color: Color(0xFFE5E7EB)),
-
-          // --- [3번째 줄 이하] 후보자 영역 ---
-          Expanded(
-            child: Row(
-              children: List.generate(_columnCount, (index) {
-                return _buildColumnSection(index);
-              }),
-            ),
-          ),
         ],
       ),
 
-      // Floating 후보추가 버튼
-      // Floating 후보추가 버튼 영역
-      // Floating 후보추가 버튼 영역
-      floatingActionButton: _isVotingMode ? null : Container(
+      // Floating 후보추가 버튼 영역 (투표 중에는 null)
+      // Floating 후보추가 버튼 영역 (투표 중에는 null)
+      floatingActionButton: _isVotingMode
+          ? null
+          : Container(
         height: 60,
         width: MediaQuery.of(context).size.width,
-        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Row(
-          children: List.generate(_columnCount, (index) {
-            return Expanded(
-              child: Align(
-                alignment: Alignment.center,
-                child: SizedBox(
-                  width: _columnCount == 1 ? 200 : 150,
-                  height: 60,
-                  child: FloatingActionButton.extended(
-                    heroTag: 'fab_column_$index',
-                    backgroundColor: const Color(0xFF134686),
-                    onPressed: () => _showAddCandidateDialog(index),
-                    icon: const Icon(Icons.add, color: Colors.white),
-                    label: const Text('후보 추가', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: () {
+            // 1. 상태 계산
+            int totalCandidates = _candidateColumns.fold(0, (sum, column) => sum + column.length);
+            // 조건: 1인 1투표제(_columnCount == 1)이면서 총 후보자가 1명일 때
+            bool isSpecialLayout = (_columnCount == 1 && totalCandidates == 1);
+
+            if (isSpecialLayout) {
+              // 2. 특수 레이아웃: 25% (빈공간) : 50% (버튼) : 25% (빈공간)
+              double screenWidth = MediaQuery.of(context).size.width - 32; // 패딩 제외
+              return [
+                SizedBox(width: screenWidth * 0.25), // 왼쪽 빈 공간 (25%)
+                SizedBox(
+                  width: screenWidth * 0.5, // 중앙 버튼 영역 (50%)
+                  child: Center(
+                    child: SizedBox(
+                      width: 150, // 실제 버튼 크기는 고정
+                      height: 52,
+                      child: FloatingActionButton.extended(
+                        heroTag: 'fab_column_0',
+                        elevation: 4,
+                        backgroundColor: const Color(0xFF134686),
+                        onPressed: () => _showAddCandidateDialog(0),
+                        icon: const Icon(Icons.add, color: Colors.white),
+                        label: const Text('후보 추가',
+                            style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30)),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            );
-          }),
+                SizedBox(width: screenWidth * 0.25), // 오른쪽 빈 공간 (25%)
+              ];
+            } else {
+              // 3. 기존 레이아웃: 단 수에 맞춰 배분
+              return List.generate(_columnCount, (index) {
+                double sectionWidth = (MediaQuery.of(context).size.width - 32) / _columnCount;
+                return SizedBox(
+                  width: sectionWidth,
+                  child: Center(
+                    child: SizedBox(
+                      width: 150,
+                      height: 52,
+                      child: FloatingActionButton.extended(
+                        heroTag: 'fab_column_$index',
+                        elevation: 4,
+                        backgroundColor: const Color(0xFF134686),
+                        onPressed: () => _showAddCandidateDialog(index),
+                        icon: const Icon(Icons.add, color: Colors.white),
+                        label: const Text('후보 추가',
+                            style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30)),
+                      ),
+                    ),
+                  ),
+                );
+              });
+            }
+          }(), // 즉시 실행 함수로 리스트 반환
         ),
       ),
-      // 하단 바 중앙 위쪽에 걸치도록 설정
+
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
 
-      // 하단 설정 BAR
-      // 하단 설정 BAR
       // 하단 설정 BAR 호출
       bottomNavigationBar: VoteSettingsBar(
-        isDesktop: isDesktop, // <--- 이 부분을 반드시 추가해야 에러가 사라집니다!
+        isDesktop: isDesktop,
+        isVotingMode: _isVotingMode,
         candidateCount: _candidateColumns.fold(0, (p, c) => p + c.length),
         columnCount: _columnCount,
-        voteDisplayOption: _voteDisplayOption,
+        voteDisplayOption: _voteDisplayOption, // 1. 현재 부모의 상태를 전달
         voteCount: _voteCount,
         numberController: _numberController,
         onColumnCountChanged: (v) => _updateColumns(v),
-        onVoteDisplayChanged: (v) => setState(() => _voteDisplayOption = v),
+        onVoteDisplayChanged: (v) {
+          setState(() {
+            _voteDisplayOption = v; // 2. 자식(Bar)에서 바뀔 때마다 부모 상태 동기화
+            print("방식 변경됨: $_voteDisplayOption"); // 디버깅용
+          });
+        },
         onIncrementVote: () {
           setState(() {
             _voteCount++;
@@ -676,34 +816,134 @@ class _MainPageState extends State<MainPage> {
           });
         },
         onVoteCountInput: (v) => setState(() => _voteCount = int.tryParse(v) ?? 0),
-        onStartVote: _candidateColumns.any((column) => column.isNotEmpty)
+        onStartVote: _candidateColumns.any((col) => col.isNotEmpty)
             ? () {
-          // 1. [해결 방법] 투표 시작 버튼을 누르는 순간 모든 입력창의 포커스를 해제합니다.
-          FocusScope.of(context).unfocus();
+          // 1. 현재 선택된 옵션 명칭 및 설명 설정
+          String methodTitle = _voteDisplayOption;
+          String methodDescription = "";
 
-          setState(() {
-            _isVotingMode = !_isVotingMode;
-          });
-
-          if (_isVotingMode) {
-            print("==============================");
-            print("📢 투표를 시작합니다!");
-            print("▶ 투표제 설정: 1인 $_columnCount표제"); // 수정: $_columnCount가 단의 수이자 곧 표의 수라면
-            print("▶ 방식 설정: $_voteDisplayOption");
-            print("▶ 후보자 수: ${_candidateColumns.fold(0, (p, c) => p + c.length)}명");
-            print("▶ 투표자 총원: $_voteCount");
-            print("==============================");
+          if (methodTitle.contains('(터치)') && methodTitle.contains('안보이게')) {
+            methodDescription = "손으로 후보자 이름을 터치하세요. 하지만 누구를 선택했는지 표시되지는 않습니다.";
+          } else if (methodTitle.contains('(터치)') && methodTitle.contains('보이게')) {
+            methodDescription = "손으로 후보자 이름을 터치하세요. 선택한 후보자가 표시됩니다.";
+          } else if (methodTitle.contains('(키보드)') && methodTitle.contains('안보이게')) {
+            methodDescription = "키보드의 숫자키로 후보자 번호를 눌러주세요. 누구를 선택했는지 표시되지는 않습니다.";
+          } else if (methodTitle.contains('(키보드)') && methodTitle.contains('보이게')) {
+            methodDescription = "키보드의 숫자키로 후보자 번호를 눌러주세요. 선택한 후보자가 표시됩니다.";
           } else {
-            print("투표 종료");
+            methodDescription = "선택하신 방식에 따라 투표를 진행합니다.";
           }
+
+          // 2. 투표 시작 전 안내 다이얼로그 표시
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext dialogContext) { // 다이얼로그 전용 context 이름을 dialogContext로 변경
+              return AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                title: const Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Color(0xFF134686)),
+                    SizedBox(width: 10),
+                    Text('투표 설정 안내', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('투표제: 1인 $_columnCount투표제', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8, bottom: 12, top: 4),
+                      child: Text('- 투표자 1명이 $_columnCount번의 투표를 실시합니다.', style: const TextStyle(color: Colors.black54)),
+                    ),
+                    Text('방식: $methodTitle', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8, bottom: 12, top: 4),
+                      child: Text('- $methodDescription', style: const TextStyle(color: Colors.black54)),
+                    ),
+                    Text('총원: $_voteCount명', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8, top: 4),
+                      child: Text('- 전체 투표자는 $_voteCount명입니다.', style: const TextStyle(color: Colors.black54)),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    // 다이얼로그를 닫을 때는 dialogContext를 사용
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: const Text('취소', style: TextStyle(color: Colors.grey)),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF134686),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () async {
+                      // [해결] 다이얼로그를 먼저 닫고
+                      Navigator.of(dialogContext).pop();
+
+                      // [중요] 다이얼로그가 닫힌 후 본체(context)가 여전히 유효한지 확인
+                      if (!mounted) return;
+
+                      // 키보드 닫기
+                      FocusScope.of(context).unfocus();
+
+                      // 애니메이션 시작
+                      setState(() { _isAnimating = true; });
+
+                      // 애니메이션 대기 (1.5초)
+                      await Future.delayed(const Duration(milliseconds: 1500));
+
+                      // [중요] 비동기 작업 후 다시 한 번 mounted 체크
+                      if (!mounted) return;
+
+                      // 상태 업데이트
+                      setState(() {
+                        _isVotingMode = true;
+                        _isAnimating = false;
+                      });
+
+                      // 콘솔 출력
+                      print("==============================");
+                      print("📢 투표를 시작합니다!");
+                      print("▶ 투표제 설정: 1인 $_columnCount표제");
+                      print("▶ 방식 설정: $_voteDisplayOption");
+                      print("▶ 후보자 수: ${_candidateColumns.fold(0, (p, c) => p + c.length)}명");
+                      print("▶ 투표 참여 인원: $_voteCount");
+                      print("==============================");
+
+                      // [해결] 최종 페이지 이동 시 Scaffold의 context를 사용
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ElectionPage(
+                            title: _electionTitleController.text,
+                            columnCount: _columnCount,
+                            totalVoteCount: _voteCount,
+                            candidateColumns: _candidateColumns,
+                            descriptionColumns: _descriptionColumns,
+                            candidateColors: _candidateButtonColors,
+                            fontColors: _fixedFontColors,
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text('투표 시작'),
+                  ),
+                ],
+              );
+            },
+          );
         }
+
             : null,
       ),
-
-
-
     );
   }
+
 }
 
 // 점선 테두리를 그리는 CustomPainter (import 'dart:ui' 필요)

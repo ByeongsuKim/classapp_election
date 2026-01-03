@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class VoteSettingsBar extends StatelessWidget {
-  final bool isDesktop; // 사용자 기기 판별
+  final bool isDesktop;
   final int candidateCount;
   final int columnCount;
   final String voteDisplayOption;
@@ -13,6 +13,7 @@ class VoteSettingsBar extends StatelessWidget {
   final VoidCallback onDecrementVote;
   final Function(String) onVoteCountInput;
   final VoidCallback? onStartVote;
+  final bool isVotingMode; // 추가된 필드
 
   const VoteSettingsBar({
     super.key,
@@ -27,27 +28,30 @@ class VoteSettingsBar extends StatelessWidget {
     required this.onIncrementVote,
     required this.onDecrementVote,
     required this.onVoteCountInput,
+    required this.isVotingMode, // 생성자 추가
     this.onStartVote,
   });
 
   @override
   Widget build(BuildContext context) {
-    // 기기 종류에 따른 옵션 리스트 정의
     List<String> displayOptions;
     if (isDesktop) {
-      displayOptions = [
-        '(키보드) 선택 안보이게',
-        '(키보드) 선택 보이게',
-      ];
+      displayOptions = ['(키보드) 선택 안보이게', '(키보드) 선택 보이게'];
     } else {
       displayOptions = [
-        '(터치) 선택 안보이게',
-        '(터치) 선택 보이게',
-        '(키보드) 선택 안보이게',
-        '(키보드) 선택 보이게',
+        '(터치) 선택 안보이게', '(터치) 선택 보이게',
+        '(키보드) 선택 안보이게', '(키보드) 선택 보이게'
       ];
     }
 
+    // [추가] 현재 부모가 가진 값이 현재 환경의 리스트에 없는 값(예: 데스크탑인데 터치 옵션인 경우)이라면
+    // 혹은 초기값이 리스트와 다르다면 첫 번째 옵션으로 강제 동기화
+    if (!displayOptions.contains(voteDisplayOption)) {
+      // build 중에 setState를 직접 호출할 수 없으므로 프레임 렌더링 후 실행
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        onVoteDisplayChanged(displayOptions[0]);
+      });
+    }
 
     return Container(
       height: 100,
@@ -58,7 +62,6 @@ class VoteSettingsBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // 1. 좌측: 후보 수
           Expanded(
             flex: 2,
             child: Text(
@@ -66,24 +69,19 @@ class VoteSettingsBar extends StatelessWidget {
               style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
             ),
           ),
-
-          // 2. 중앙: FAB 공간 (Spacer)
           const Spacer(flex: 1),
-
-          // 3. 우측: 설정 메뉴들 + 시작 버튼
           Expanded(
             flex: 12,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                // 투표제 설정
                 _buildSettingBox(
                   label: '투표제',
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<int>(
                       value: columnCount,
                       isDense: true,
-                      onChanged: (v) => onColumnCountChanged(v!),
+                      onChanged: isVotingMode ? null : (v) => onColumnCountChanged(v!),
                       items: [1, 2, 3, 4].map((i) => DropdownMenuItem(
                         value: i,
                         child: Text('1인 ${i}표제', style: const TextStyle(fontSize: 13)),
@@ -92,8 +90,6 @@ class VoteSettingsBar extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-
-                // 방식 설정
                 _buildSettingBox(
                   label: '방식',
                   child: DropdownButtonHideUnderline(
@@ -102,7 +98,7 @@ class VoteSettingsBar extends StatelessWidget {
                           ? voteDisplayOption
                           : displayOptions.first,
                       isDense: true,
-                      onChanged: (v) => onVoteDisplayChanged(v!),
+                      onChanged: isVotingMode ? null : (v) => onVoteDisplayChanged(v!),
                       items: displayOptions.map((String s) {
                         return DropdownMenuItem(
                           value: s,
@@ -113,8 +109,6 @@ class VoteSettingsBar extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-
-                // 총원 설정
                 _buildSettingBox(
                   label: '총원',
                   child: Row(
@@ -122,7 +116,7 @@ class VoteSettingsBar extends StatelessWidget {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.remove, size: 18),
-                        onPressed: onDecrementVote,
+                        onPressed: isVotingMode ? null : onDecrementVote,
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
@@ -130,6 +124,7 @@ class VoteSettingsBar extends StatelessWidget {
                         width: 30,
                         child: TextField(
                           controller: numberController,
+                          enabled: !isVotingMode,
                           textAlign: TextAlign.center,
                           decoration: const InputDecoration(border: InputBorder.none, isDense: true),
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
@@ -138,7 +133,7 @@ class VoteSettingsBar extends StatelessWidget {
                       ),
                       IconButton(
                         icon: const Icon(Icons.add, size: 18),
-                        onPressed: onIncrementVote,
+                        onPressed: isVotingMode ? null : onIncrementVote,
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
@@ -146,16 +141,18 @@ class VoteSettingsBar extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 16),
-
-                // 투표 시작 버튼
+                // 에러가 났던 버튼 영역 수정 완료
                 FilledButton(
                   onPressed: onStartVote,
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.deepOrange,
+                    backgroundColor: isVotingMode ? Colors.red : Colors.deepOrange,
                     minimumSize: const Size(110, 52),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text('투표 시작', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: Text(
+                      isVotingMode ? '투표 종료' : '투표 시작',
+                      style: const TextStyle(fontWeight: FontWeight.bold)
+                  ),
                 ),
               ],
             ),
@@ -166,68 +163,27 @@ class VoteSettingsBar extends StatelessWidget {
   }
 
   Widget _buildSettingBox({required String label, required Widget child}) {
-    return CustomPaint(
-      painter: DashedBorderPainter(color: Colors.black.withOpacity(0.4), strokeWidth: 1.2, gap: 4.0),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-        decoration: BoxDecoration(
-          color: Colors.amberAccent,
-          borderRadius: BorderRadius.circular(6.0),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            const SizedBox(width: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.7),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: child,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      decoration: BoxDecoration(
+        color: Colors.amberAccent,
+        borderRadius: BorderRadius.circular(6.0),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          const SizedBox(width: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(4),
             ),
-          ],
-        ),
+            child: child,
+          ),
+        ],
       ),
     );
   }
-}
-
-// 점선 테두리 Painter (함께 분리)
-class DashedBorderPainter extends CustomPainter {
-  final Color color;
-  final double strokeWidth;
-  final double gap;
-
-  DashedBorderPainter({required this.color, required this.strokeWidth, required this.gap});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()
-      ..color = color
-      ..strokeWidth = strokeWidth
-      ..style = PaintingStyle.stroke;
-
-    final Path path = Path()
-      ..addRRect(RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, 0, size.width, size.height),
-        const Radius.circular(8.0),
-      ));
-
-    for (final measure in path.computeMetrics()) {
-      double distance = 0.0;
-      bool draw = true;
-      while (distance < measure.length) {
-        if (draw) {
-          canvas.drawPath(measure.extractPath(distance, distance + gap), paint);
-        }
-        distance += gap;
-        draw = !draw;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

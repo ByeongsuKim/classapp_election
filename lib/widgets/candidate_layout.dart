@@ -5,6 +5,8 @@ class CandidateLayout extends StatelessWidget {
   final int columnIndex;
   final int columnCount;
   final List<TextEditingController> candidates;
+  final List<int>? votes;
+  final int? maxVotes;
   final Color backgroundColor;
   final Color fontColor;
   final Function(int index) onTapCandidate;
@@ -21,6 +23,8 @@ class CandidateLayout extends StatelessWidget {
     required this.onTapCandidate,
     required this.onDeleteCandidate,
     required this.isVotingMode,
+    this.votes,
+    this.maxVotes,
   });
 
   @override
@@ -122,14 +126,22 @@ class CandidateLayout extends StatelessWidget {
     return Column(children: rowWidgets);
   }
 
+  // _buildExpandedCard 메서드 수정
   Widget _buildExpandedCard(int index) {
+    // 현재 후보가 1위인지 확인 (득표수가 있고, 0보다 크며, 최고 득표수와 같은 경우)
+    final bool isWinner = votes != null &&
+        votes![index] > 0 &&
+        votes![index] == maxVotes;
+
     return Expanded(
       child: CandidateCard(
         index: index,
-        // 중요: Controller의 .text를 직접 전달하여 실시간 텍스트 반영 보장
         name: candidates[index].text,
         backgroundColor: backgroundColor,
         fontColor: fontColor,
+        // [추가 속성 전달]
+        voteCount: votes != null ? votes![index] : null,
+        isWinner: isWinner,
         onTap: () => onTapCandidate(index),
         onDelete: isVotingMode ? null : () => onDeleteCandidate(index),
       ),
