@@ -637,23 +637,46 @@ class _MainPageState extends State<MainPage> {
                     ),
                     textAlign: TextAlign.center,
                   )
-                      : IntrinsicWidth(
-                    child: TextField(
-                      controller: _electionTitleController,
-                      textAlign: TextAlign.center,
-                      cursorWidth: 0,
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                        isCollapsed: true,
+                      : Stack(
+                    alignment: Alignment.center,
+                    clipBehavior: Clip.none, // 아이콘이 텍스트 밖으로 나가도 보이게 설정
+                    children: [
+                      IntrinsicWidth(
+                        child: TextField(
+                          controller: _electionTitleController,
+                          textAlign: TextAlign.center,
+                          cursorWidth: 2, // 편집 상태임을 알 수 있게 커서 표시
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                            isCollapsed: true,
+                          ),
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0,
+                          ),
+                        ),
                       ),
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0,
+                      // [추가] 연필 아이콘: 오버래핑 방식으로 배치하여 기존 UI 위치에 영향 없음
+                      Positioned(
+                        right: -25, // 글자 끝에서 오른쪽으로 25px 떨어진 지점
+                        top: -2,    // 상단에 살짝 걸치게 배치
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.edit,
+                            size: 14,
+                            color: Color(0xFF134686),
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -923,6 +946,7 @@ class _MainPageState extends State<MainPage> {
                             title: _electionTitleController.text,
                             columnCount: _columnCount,
                             totalVoteCount: _voteCount,
+                            voteDisplayOption: _voteDisplayOption,  // <-
                             candidateColumns: _candidateColumns,
                             descriptionColumns: _descriptionColumns,
                             candidateColors: _candidateButtonColors,

@@ -13,6 +13,10 @@ class CandidateLayout extends StatelessWidget {
   final Function(int index) onDeleteCandidate;
   final bool isVotingMode;
 
+  // [추가 필드]
+  final int? selectedCandidateIndex;
+  final bool showSelectionBorder;
+
   const CandidateLayout({
     super.key,
     required this.columnIndex,
@@ -25,6 +29,8 @@ class CandidateLayout extends StatelessWidget {
     required this.isVotingMode,
     this.votes,
     this.maxVotes,
+    this.selectedCandidateIndex,    // 부모(ElectionPage)로부터 전달받음
+    this.showSelectionBorder = false, // 부모(ElectionPage)로부터 전달받음
   });
 
   @override
@@ -62,7 +68,6 @@ class CandidateLayout extends StatelessWidget {
       rows.add(Expanded(child: Row(children: rowItems)));
     }
 
-    // 최소 4줄 유지 로직
     int rowCount = (totalCandidates / 2).ceil();
     if (rowCount < 4) {
       for (int i = 0; i < (4 - rowCount); i++) {
@@ -72,7 +77,7 @@ class CandidateLayout extends StatelessWidget {
     return Column(children: rows);
   }
 
-  // 단일 레이아웃 로직 (1~8인 이상)
+  // 단일 레이아웃 로직
   Widget _buildSingleColumnGrid(int totalCandidates) {
     if (totalCandidates <= 3) {
       return Center(
@@ -86,7 +91,6 @@ class CandidateLayout extends StatelessWidget {
       );
     }
 
-    // 4인 이상 격자 계산 로직
     List<int> candidatesPerRow;
     int maxItems;
     if (totalCandidates == 4) { candidatesPerRow = [2, 2]; maxItems = 2; }
@@ -113,7 +117,6 @@ class CandidateLayout extends StatelessWidget {
       for (int i = 0; i < count; i++) {
         rowItems.add(_buildExpandedCard(currentIndex++));
       }
-      // 정렬용 빈칸
       if (count < maxItems) {
         int diff = maxItems - count;
         for (int i = 0; i < diff; i++) {
@@ -126,12 +129,14 @@ class CandidateLayout extends StatelessWidget {
     return Column(children: rowWidgets);
   }
 
-  // _buildExpandedCard 메서드 수정
+  // 개별 후보자 카드 생성
   Widget _buildExpandedCard(int index) {
-    // 현재 후보가 1위인지 확인 (득표수가 있고, 0보다 크며, 최고 득표수와 같은 경우)
     final bool isWinner = votes != null &&
         votes![index] > 0 &&
         votes![index] == maxVotes;
+
+    // [중요] 현재 카드가 선택된 상태인지 확인
+    final bool isSelected = selectedCandidateIndex == index;
 
     return Expanded(
       child: CandidateCard(
@@ -139,9 +144,11 @@ class CandidateLayout extends StatelessWidget {
         name: candidates[index].text,
         backgroundColor: backgroundColor,
         fontColor: fontColor,
-        // [추가 속성 전달]
         voteCount: votes != null ? votes![index] : null,
         isWinner: isWinner,
+        // [추가] 선택 상태와 테두리 표시 옵션을 하위 위젯으로 전달
+        isSelected: isSelected,
+        showSelectionBorder: showSelectionBorder,
         onTap: () => onTapCandidate(index),
         onDelete: isVotingMode ? null : () => onDeleteCandidate(index),
       ),
