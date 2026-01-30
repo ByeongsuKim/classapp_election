@@ -56,7 +56,10 @@ class _MainPageState extends State<MainPage> {
   int _currentVoterIndex = 1; // 현재 투표 중인 학생 순서(1번부터 시작)
   bool _showVoteAnimation = false; //1
 
+  final FocusNode _titleFocusNode = FocusNode(); // [추가] 제목 포커스 노드
+
   final TextEditingController _electionTitleController = TextEditingController();
+
   String _electionTitle = '';
   final TextEditingController _numberController = TextEditingController(text: '20');
   final List<TextEditingController> _candidateControllers = [];
@@ -88,6 +91,16 @@ class _MainPageState extends State<MainPage> {
     _updateTitleForColumnCount(_columnCount);
     _updateColumns(_columnCount);
     _numberController.text = _voteCount.toString();
+    /*
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // 1. TextField에 포커스를 줍니다.
+      _titleFocusNode.requestFocus();
+      // 2. 커서 위치를 텍스트의 맨 끝으로 설정합니다.
+      _electionTitleController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _electionTitleController.text.length),
+      );
+    });
+    */
   }
 
   void _updateBrowserTabTitle() {
@@ -124,6 +137,7 @@ class _MainPageState extends State<MainPage> {
   void dispose() {
     _electionTitleController.removeListener(_updateBrowserTabTitle);
     _electionTitleController.dispose();
+    _titleFocusNode.dispose(); // [추가] 포커스 노드 메모리 해제
     _numberController.dispose();
     for (var controller in _candidateControllers) {
       controller.dispose();
@@ -617,6 +631,9 @@ class _MainPageState extends State<MainPage> {
       backgroundColor: const Color(0xFFF3F4F6),
       // Stack을 사용하여 기존 UI 위에 애니메이션 레이어를 겹침
       body: Stack(
+
+        clipBehavior: Clip.none,
+
         children: [
           // 1. 메인 UI 레이어 (기존 Column 구조)
           Column(
@@ -624,6 +641,7 @@ class _MainPageState extends State<MainPage> {
               // --- [1번째 줄] 설정 메뉴 영역 (투표제 & 투표 방식) ---
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+                //padding: const EdgeInsets.only(top: 8.0, left: 24.0, right: 24.0),
                 color: Colors.white,
                 height: 60,
                 child: Center(
@@ -637,46 +655,23 @@ class _MainPageState extends State<MainPage> {
                     ),
                     textAlign: TextAlign.center,
                   )
-                      : Stack(
-                    alignment: Alignment.center,
-                    clipBehavior: Clip.none, // 아이콘이 텍스트 밖으로 나가도 보이게 설정
-                    children: [
-                      IntrinsicWidth(
-                        child: TextField(
-                          controller: _electionTitleController,
-                          textAlign: TextAlign.center,
-                          cursorWidth: 2, // 편집 상태임을 알 수 있게 커서 표시
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 10),
-                            isCollapsed: true,
-                          ),
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0,
-                          ),
-                        ),
-                      ),
-                      // [추가] 연필 아이콘: 오버래핑 방식으로 배치하여 기존 UI 위치에 영향 없음
-                      Positioned(
-                        right: -25, // 글자 끝에서 오른쪽으로 25px 떨어진 지점
-                        top: -2,    // 상단에 살짝 걸치게 배치
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.edit,
-                            size: 14,
-                            color: Color(0xFF134686),
-                          ),
-                        ),
-                      ),
-                    ],
+                      : TextField(
+                    controller: _electionTitleController,
+                    focusNode: _titleFocusNode,
+                    textAlign: TextAlign.center,
+                    cursorWidth: 2,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                      isCollapsed: true,
+                    ),
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0,
+                    ),
                   ),
                 ),
               ),

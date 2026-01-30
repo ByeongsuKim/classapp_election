@@ -15,8 +15,10 @@ class CandidateCard extends StatelessWidget {
   final bool isSelected;
   final bool showSelectionBorder;
 
+  // [수정 1] isResultMode 필드를 여기에 추가합니다.
+  final bool isResultMode;
+
   const CandidateCard({
-    super.key,
     required this.index,
     required this.name,
     required this.backgroundColor,
@@ -28,6 +30,8 @@ class CandidateCard extends StatelessWidget {
     // [추가] 생성자에 매개변수 포함
     this.isSelected = false,
     this.showSelectionBorder = false,
+    this.isResultMode = false,
+    super.key,
   });
 
   @override

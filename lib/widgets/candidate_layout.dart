@@ -2,23 +2,33 @@ import 'package:flutter/material.dart';
 import 'candidate_card.dart';
 
 class CandidateLayout extends StatelessWidget {
+  // 기본 설정
   final int columnIndex;
   final int columnCount;
   final List<TextEditingController> candidates;
-  final List<int>? votes;
-  final int? maxVotes;
   final Color backgroundColor;
   final Color fontColor;
-  final Function(int index) onTapCandidate;
-  final Function(int index) onDeleteCandidate;
-  final bool isVotingMode;
 
-  // [추가 필드]
+  // 모드 및 상태 관련
+  final bool isVotingMode;
+  final bool isResultMode; // 결과 표시 모드
+
+  // 투표 및 결과 데이터
+  final List<int>? votes; // 실시간 투표 상황 (당선자 표시용)
+  final int? maxVotes;
+  final List<int>? voteResults; // 최종 투표 결과 (득표수 표시용)
+
+  // 선택 상태
   final int? selectedCandidateIndex;
   final bool showSelectionBorder;
 
+  // 콜백 함수
+  final Function(int index) onTapCandidate;
+  final Function(int index) onDeleteCandidate;
+
+
   const CandidateLayout({
-    super.key,
+    // 기본 설정
     required this.columnIndex,
     required this.columnCount,
     required this.candidates,
@@ -26,11 +36,21 @@ class CandidateLayout extends StatelessWidget {
     required this.fontColor,
     required this.onTapCandidate,
     required this.onDeleteCandidate,
+
+    // 모드 및 상태 관련
     required this.isVotingMode,
+    this.isResultMode = false, // 기본값은 false
+
+    // 투표 및 결과 데이터
     this.votes,
     this.maxVotes,
-    this.selectedCandidateIndex,    // 부모(ElectionPage)로부터 전달받음
-    this.showSelectionBorder = false, // 부모(ElectionPage)로부터 전달받음
+    this.voteResults, // 결과 모드에서 사용
+
+    // 선택 상태
+    this.selectedCandidateIndex,
+    this.showSelectionBorder = false,
+
+    super.key,
   });
 
   @override
@@ -131,12 +151,19 @@ class CandidateLayout extends StatelessWidget {
 
   // 개별 후보자 카드 생성
   Widget _buildExpandedCard(int index) {
+    // isWinner 로직은 실시간 투표 상황에만 사용
     final bool isWinner = votes != null &&
+        votes!.isNotEmpty &&
         votes![index] > 0 &&
         votes![index] == maxVotes;
 
-    // [중요] 현재 카드가 선택된 상태인지 확인
+    // 현재 카드가 선택된 상태인지 확인 (투표 진행 시)
     final bool isSelected = selectedCandidateIndex == index;
+
+    // [핵심] 결과 모드일 때 보여줄 득표수
+    final int? resultVoteCount = isResultMode && voteResults != null && voteResults!.length > index
+        ? voteResults![index]
+        : null;
 
     return Expanded(
       child: CandidateCard(
@@ -144,13 +171,16 @@ class CandidateLayout extends StatelessWidget {
         name: candidates[index].text,
         backgroundColor: backgroundColor,
         fontColor: fontColor,
-        voteCount: votes != null ? votes![index] : null,
+        // [수정] 결과 모드일 때는 최종 득표수를, 아닐 때는 실시간 득표수를 전달
+        voteCount: isResultMode ? resultVoteCount : (votes != null ? votes![index] : null),
         isWinner: isWinner,
-        // [추가] 선택 상태와 테두리 표시 옵션을 하위 위젯으로 전달
         isSelected: isSelected,
         showSelectionBorder: showSelectionBorder,
         onTap: () => onTapCandidate(index),
-        onDelete: isVotingMode ? null : () => onDeleteCandidate(index),
+        // [수정] 투표 모드나 결과 모드에서는 삭제 버튼 비활성화
+        onDelete: (isVotingMode || isResultMode) ? null : () => onDeleteCandidate(index),
+        // [추가] 결과 모드 여부를 CandidateCard에 전달
+        isResultMode: isResultMode,
       ),
     );
   }

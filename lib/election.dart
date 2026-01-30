@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:classapp_election/widgets/candidate_layout.dart';
+import 'package:classapp_election/result.dart';
 
 class ElectionPage extends StatefulWidget {
   final String title;
@@ -199,7 +200,7 @@ class _ElectionPageState extends State<ElectionPage> {
       setState(() => currentVoterIndex++);
       _startNewVoterProcess(currentVoterIndex);
     } else {
-      setState(() => _overlayMessage = "모든 투표가 완료되었습니다");
+      setState(() => _overlayMessage = "모든 투표가 완료되었습니다.\n투표결과를 보시겠습니까?");
     }
   }
 
@@ -408,6 +409,9 @@ class _ElectionPageState extends State<ElectionPage> {
   }
 
   Widget _buildFullOverlay() {
+    // "투표결과" 라는 키워드가 포함되어 있는지 확인하여 버튼 표시 여부를 결정합니다.
+    bool showResultButton = _overlayMessage.contains("투표결과");
+
     return Positioned.fill(
       child: Container(
         color: const Color(0xFF134686).withOpacity(0.95),
@@ -415,19 +419,73 @@ class _ElectionPageState extends State<ElectionPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.how_to_vote, size: 100, color: Colors.white),
-              const SizedBox(height: 30),
+              // 1. 아이콘 표시 로직: "투표결과" 메시지가 아닐 때만 아이콘을 표시합니다.
+              if (!showResultButton)
+                const Icon(Icons.how_to_vote, size: 100, color: Colors.white),
+
+              if (!showResultButton) const SizedBox(height: 20),
+
+              // 2. 메시지 텍스트: 항상 표시됩니다.
               Text(
                 _overlayMessage,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white),
+                textAlign: TextAlign.center, // 텍스트를 중앙 정렬합니다.
+                style: const TextStyle(
+                  fontSize: 40,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 2,
+                  height: 1.4, // 줄 간격을 조절합니다.
+                ),
               ),
+
+              const SizedBox(height: 40), // 메시지와 버튼/인디케이터 사이 간격
+
+              // 3. 버튼 또는 로딩 인디케이터 표시 로직
+              if (showResultButton)
+              // "투표결과" 메시지일 때 [투표 결과 보기] 버튼을 표시합니다.
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white, // 버튼 배경색
+                    foregroundColor: const Color(0xFF134686), // 버튼 글자색
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                    textStyle: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onPressed: () {
+                    print("결과 보기 버튼 클릭됨! Result 페이지로 이동");
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ResultPage(
+                          // ResultPage에 필요한 모든 정보를 전달합니다.
+                          title: widget.title,
+                          columnCount: widget.columnCount,
+                          descriptionColumns: widget.descriptionColumns,
+                          candidateColumns: widget.candidateColumns,
+                          candidateColors: widget.candidateColors,
+                          fontColors: widget.fontColors,
+                          voteResults: _accumulatedVotes, // 최종 투표 결과를 전달
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text("투표 결과 보기"),
+                )
+              else if (_isProcessing)
+              // "투표결과" 메시지가 아니고, 처리 중일 때 로딩 인디케이터를 표시합니다.
+                const CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
             ],
           ),
         ),
       ),
     );
   }
+
 
   Widget _buildBottomBar() {
     return Container(
