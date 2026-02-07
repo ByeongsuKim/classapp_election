@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- [핵심 추가] 안드로이드 9 이하를 위한 권한 -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <!-- 안드로이드 10 이상에서는 image_gallery_saver가 자체적으로 처리하지만, 명시적으로 추가해두면 좋습니다. -->
+
     <application
         android:label="classapp_election"
         android:name="${applicationName}"

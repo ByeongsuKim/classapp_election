@@ -1,10 +1,21 @@
-import 'dart:math';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart'; // kIsWeb을 사용하기 위해 추가
 import 'package:flutter/material.dart';
+
+// 위젯 및 유틸리티
 import 'package:classapp_election/widgets/candidate_layout.dart';
+import 'package:intl/intl.dart';
+import 'package:screenshot/screenshot.dart';
 
-// vote_setting_bar.dart를 더 이상 사용하지 않습니다.
+// 라이브러리
+import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:open_file_plus/open_file_plus.dart';
 
-class ResultPage extends StatelessWidget {
+// 웹 전용 다운로드 기능을 위해 dart:html을 import (모바일에서는 무시됨)
+import 'dart:html' as html;
+
+class ResultPage extends StatefulWidget {
   final String title;
   final int columnCount;
   final List<List<TextEditingController>> descriptionColumns;
@@ -25,48 +36,156 @@ class ResultPage extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    // 하단 바에 전달할 총 투표 수를 계산
-    int totalVoteCount = 0;
-    if (voteResults.isNotEmpty) {
-      totalVoteCount = voteResults
-          .expand((votes) => votes)
-          .fold(0, (sum, item) => sum + item);
-    }
+  State<ResultPage> createState() => _ResultPageState();
+}
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
-      appBar: AppBar(
-        automaticallyImplyLeading: true,
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        title: Text("$title 최종 결과", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 26)),
-        toolbarHeight: 70,
+class _ResultPageState extends State<ResultPage> {
+  final ScreenshotController _screenshotController = ScreenshotController();
+  String? _savedImagePath;
+  bool _isProcessing = false; // [핵심 수정] 중복 클릭 방지를 위한 상태 변수
+
+  // [핵심 수정] 웹과 모바일 로직을 통합하고, 웹에서는 캡처와 다운로드를 한번에 처리
+  Future<void> _captureAndProcess() async {
+    // 중복 실행 방지
+    if (_isProcessing) return;
+    setState(() => _isProcessing = true);
+
+    try {
+      final Uint8List? imageBytes = await _screenshotController.capture(
+          delay: const Duration(milliseconds: 100));
+
+      if (imageBytes == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('이미지 캡처에 실패했습니다.')),
+        );
+        return;
+      }
+
+      final String timeStamp = DateFormat('yyMMdd_HHmmss').format(DateTime.now());
+      final String fileName = '${widget.title}_$timeStamp.png';
+
+      if (kIsWeb) {
+        // 웹: 캡처 후 즉시 다운로드 실행
+        final blob = html.Blob([imageBytes], 'image/png');
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        final anchor = html.document.createElement('a') as html.AnchorElement
+          ..href = url
+          ..style.display = 'none'
+          ..download = fileName;
+        html.document.body!.children.add(anchor);
+        anchor.click();
+        html.document.body!.children.remove(anchor);
+        html.Url.revokeObjectUrl(url);
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('이미지 다운로드가 시작되었습니다.')),
+        );
+      } else {
+        // 모바일: 갤러리에 저장
+        final status = await Permission.storage.request();
+        if (!status.isGranted) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('저장 권한이 거부되었습니다.')),
+          );
+          return;
+        }
+
+        final result = await ImageGallerySaver.saveImage(
+          imageBytes,
+          name: fileName,
+          quality: 95,
+        );
+
+        if (result['isSuccess']) {
+          setState(() {
+            _savedImagePath =
+                result['filePath'].toString().replaceFirst('file://', '');
+          });
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('결과가 갤러리에 저장되었습니다.'),
+              action: SnackBarAction(
+                label: '보기',
+                onPressed: _openSavedImage,
+              ),
+            ),
+          );
+        } else {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('이미지 저장에 실패했습니다.')),
+          );
+        }
+      }
+    } finally {
+      // 성공/실패 여부와 관계없이 처리 상태를 false로 변경
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
+    }
+  }
+
+  // 모바일에서만 사용하는 파일 열기 함수
+  Future<void> _openSavedImage() async {
+    // 웹에서는 이 함수를 직접 호출하지 않음
+    if (kIsWeb || _savedImagePath == null) return;
+
+    await OpenFile.open(_savedImagePath!);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Screenshot(
+      controller: _screenshotController,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF3F4F6),
+        appBar: AppBar(
+          automaticallyImplyLeading: true,
+          backgroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: true,
+          title: Text("${widget.title} 최종 결과",
+              style:
+              const TextStyle(fontWeight: FontWeight.bold, fontSize: 26)),
+          toolbarHeight: 70,
+        ),
+        body: _buildBody(),
+        bottomNavigationBar: _buildResultBottomBar(),
       ),
-      body: Column(
+    );
+  }
+
+  Widget _buildBody() {
+    return Container(
+      color: const Color(0xFFF3F4F6),
+      child: Column(
         children: [
           Expanded(
             child: Row(
-              children: List.generate(columnCount, (colIdx) {
-                return Expanded(
-                  child: _buildResultColumnWidget(colIdx),
-                );
+              children: List.generate(widget.columnCount, (colIdx) {
+                return Expanded(child: _buildResultColumnWidget(colIdx));
               }),
             ),
           ),
-          // [핵심 수정] VoteSettingsBar 대신 자체 제작한 하단 바 위젯을 호출
-          _buildResultBottomBar(context, totalVoteCount),
         ],
       ),
     );
   }
 
-  // 각 선거(열)를 구성하는 위젯
   Widget _buildResultColumnWidget(int colIdx) {
-    int maxVotes = 0;
-    if (voteResults[colIdx].isNotEmpty) {
-      maxVotes = voteResults[colIdx].reduce(max);
+    int voterCountDenominator = 0;
+    if (widget.voteResults.isNotEmpty) {
+      final int totalVoteSum =
+      widget.voteResults.expand((votes) => votes).fold(0, (sum, item) => sum + item);
+      if (widget.columnCount > 1) {
+        voterCountDenominator = totalVoteSum ~/ widget.columnCount;
+      } else {
+        voterCountDenominator = totalVoteSum;
+      }
     }
 
     return Container(
@@ -81,21 +200,24 @@ class ResultPage extends StatelessWidget {
         children: [
           const SizedBox(height: 25),
           Text(
-            descriptionColumns[colIdx].map((e) => e.text).join(" "),
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF134686)),
+            widget.descriptionColumns[colIdx].map((e) => e.text).join(" "),
+            style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF134686)),
           ),
           const Divider(height: 30),
           Expanded(
             child: CandidateLayout(
               columnIndex: colIdx,
-              columnCount: columnCount,
-              candidates: candidateColumns[colIdx],
-              backgroundColor: candidateColors[colIdx],
-              fontColor: fontColors[colIdx],
-              voteResults: voteResults[colIdx],
+              columnCount: widget.columnCount,
+              candidates: widget.candidateColumns[colIdx],
+              backgroundColor: widget.candidateColors[colIdx],
+              fontColor: widget.fontColors[colIdx],
+              voteResults: widget.voteResults[colIdx],
               isResultMode: true,
               isVotingMode: false,
-              maxVotes: maxVotes,
+              totalVoterCount: voterCountDenominator,
               onTapCandidate: (candiIdx) {},
               onDeleteCandidate: (index) {},
             ),
@@ -105,12 +227,13 @@ class ResultPage extends StatelessWidget {
     );
   }
 
-  // [새로운 기능] 결과 페이지 전용 하단 바 UI를 직접 그리는 함수
-  Widget _buildResultBottomBar(BuildContext context, int totalVoteCount) {
+  Widget _buildResultBottomBar() {
+    int totalVoteCount = widget.voteResults.expand((votes) => votes).fold(0, (sum, item) => sum + item);
+
     return Container(
       height: 100,
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 40.0),
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Colors.black12, width: 1.0)),
@@ -118,22 +241,103 @@ class ResultPage extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // 총 투표 수
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('총 투표 수', style: TextStyle(fontSize: 18, color: Colors.grey, fontWeight: FontWeight.bold)),
-              Text('$totalVoteCount 표', style: const TextStyle(fontSize: 32, color: Colors.black, fontWeight: FontWeight.bold)),
+              const Text('총 투표 수',
+                  style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.bold)),
+              Text('$totalVoteCount 표',
+                  style: const TextStyle(
+                      fontSize: 32,
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold)),
             ],
           ),
-          // 투표 상태
-          const Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Row(
             children: [
-              Text('투표 상태', style: TextStyle(fontSize: 18, color: Colors.grey, fontWeight: FontWeight.bold)),
-              Text('투표 완료', style: TextStyle(fontSize: 32, color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+              const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('투표 상태',
+                      style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.bold)),
+                  Text('투표 완료',
+                      style: TextStyle(
+                          fontSize: 32,
+                          color: Colors.blueAccent,
+                          fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(width: 20),
+              // [핵심 수정] MouseRegion으로 GestureDetector를 감싸서 커서 변경
+              MouseRegion(
+                cursor: SystemMouseCursors.click, // 손가락 모양 커서 지정
+                child: GestureDetector(
+                  // 모바일: 저장 전/후 기능 변경, 웹: 항상 캡처&다운로드
+                  onTap: (kIsWeb || _savedImagePath == null)
+                      ? _captureAndProcess
+                      : _openSavedImage,
+                  child: Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      // 모바일에서는 저장 후 색상이 바뀌지만, 웹에서는 항상 파란색
+                      color: (_savedImagePath != null && !kIsWeb)
+                          ? Colors.green
+                          : Colors.blueAccent,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.15),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: _isProcessing // 처리 중일 때 로딩 인디케이터 표시
+                        ? const Center(
+                        child: SizedBox(
+                          width: 30,
+                          height: 30,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 3.0,
+                          ),
+                        ))
+                        : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          (kIsWeb)
+                              ? Icons.download
+                              : (_savedImagePath == null
+                              ? Icons.camera_alt
+                              : Icons.open_in_new),
+                          color: Colors.white,
+                          size: 30,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          (kIsWeb)
+                              ? '저장'
+                              : (_savedImagePath == null ? '저장' : '열기'),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ],

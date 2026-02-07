@@ -9,6 +9,7 @@ class CandidateLayout extends StatelessWidget {
   final Color backgroundColor;
   final Color fontColor;
 
+
   // 모드 및 상태 관련
   final bool isVotingMode;
   final bool isResultMode; // 결과 표시 모드
@@ -17,6 +18,8 @@ class CandidateLayout extends StatelessWidget {
   final List<int>? votes; // 실시간 투표 상황 (당선자 표시용)
   final int? maxVotes;
   final List<int>? voteResults; // 최종 투표 결과 (득표수 표시용)
+
+  final int totalVoterCount;
 
   // 선택 상태
   final int? selectedCandidateIndex;
@@ -43,8 +46,9 @@ class CandidateLayout extends StatelessWidget {
 
     // 투표 및 결과 데이터
     this.votes,
-    this.maxVotes,
+    this.maxVotes = 0,
     this.voteResults, // 결과 모드에서 사용
+    this.totalVoterCount = 1,
 
     // 선택 상태
     this.selectedCandidateIndex,
@@ -151,19 +155,36 @@ class CandidateLayout extends StatelessWidget {
 
   // 개별 후보자 카드 생성
   Widget _buildExpandedCard(int index) {
-    // isWinner 로직은 실시간 투표 상황에만 사용
-    final bool isWinner = votes != null &&
-        votes!.isNotEmpty &&
-        votes![index] > 0 &&
-        votes![index] == maxVotes;
+    // [핵심 수정!] 결과 모드(isResultMode)인지 여부에 따라 isWinner 계산 방식을 다르게 합니다.
+    bool isWinner;
+    int? displayVoteCount;
+
+    if (isResultMode) {
+      // 결과 페이지일 경우: voteResults 리스트에서 최대값을 직접 찾아 당선자를 결정합니다.
+      final currentMaxVotes = voteResults?.isNotEmpty == true
+          ? voteResults!.reduce((a, b) => a > b ? a : b)
+          : 0;
+      isWinner = voteResults != null &&
+          voteResults!.length > index &&
+          voteResults![index] > 0 &&
+          voteResults![index] == currentMaxVotes;
+      displayVoteCount = voteResults != null && voteResults!.length > index
+          ? voteResults![index]
+          : null;
+    } else {
+      // 투표 진행 페이지일 경우: 기존 로직(votes와 maxVotes)을 그대로 사용합니다.
+      isWinner = votes != null &&
+          votes!.isNotEmpty &&
+          maxVotes != null &&
+          votes![index] > 0 &&
+          votes![index] == maxVotes;
+      displayVoteCount = votes != null && votes!.length > index
+          ? votes![index]
+          : null;
+    }
 
     // 현재 카드가 선택된 상태인지 확인 (투표 진행 시)
     final bool isSelected = selectedCandidateIndex == index;
-
-    // [핵심] 결과 모드일 때 보여줄 득표수
-    final int? resultVoteCount = isResultMode && voteResults != null && voteResults!.length > index
-        ? voteResults![index]
-        : null;
 
     return Expanded(
       child: CandidateCard(
@@ -171,15 +192,17 @@ class CandidateLayout extends StatelessWidget {
         name: candidates[index].text,
         backgroundColor: backgroundColor,
         fontColor: fontColor,
-        // [수정] 결과 모드일 때는 최종 득표수를, 아닐 때는 실시간 득표수를 전달
-        voteCount: isResultMode ? resultVoteCount : (votes != null ? votes![index] : null),
+        // [수정] 위에서 상황에 맞게 계산된 득표수와 당선 여부를 전달합니다.
+        voteCount: displayVoteCount,
         isWinner: isWinner,
+        columnCount: columnCount,
+        totalVoterCount: totalVoterCount,
         isSelected: isSelected,
         showSelectionBorder: showSelectionBorder,
         onTap: () => onTapCandidate(index),
-        // [수정] 투표 모드나 결과 모드에서는 삭제 버튼 비활성화
+        // 투표 모드나 결과 모드에서는 삭제 버튼 비활성화
         onDelete: (isVotingMode || isResultMode) ? null : () => onDeleteCandidate(index),
-        // [추가] 결과 모드 여부를 CandidateCard에 전달
+        // 결과 모드 여부를 CandidateCard에 전달
         isResultMode: isResultMode,
       ),
     );

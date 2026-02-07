@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 
-class CandidateCard extends StatelessWidget {
+class CandidateCard extends StatefulWidget {
   final int index;
   final String name;
   final Color backgroundColor;
@@ -10,12 +10,10 @@ class CandidateCard extends StatelessWidget {
   final VoidCallback? onDelete;
   final int? voteCount;
   final bool isWinner;
-
-  // [추가] 투표 모드에서의 선택 상태 관리를 위한 변수
+  final int totalVoterCount;
+  final int columnCount;
   final bool isSelected;
   final bool showSelectionBorder;
-
-  // [수정 1] isResultMode 필드를 여기에 추가합니다.
   final bool isResultMode;
 
   const CandidateCard({
@@ -27,7 +25,8 @@ class CandidateCard extends StatelessWidget {
     this.onDelete,
     this.voteCount,
     this.isWinner = false,
-    // [추가] 생성자에 매개변수 포함
+    this.totalVoterCount = 1,
+    this.columnCount = 1,
     this.isSelected = false,
     this.showSelectionBorder = false,
     this.isResultMode = false,
@@ -35,142 +34,232 @@ class CandidateCard extends StatelessWidget {
   });
 
   @override
+  State<CandidateCard> createState() => _CandidateCardState();
+}
+
+class _CandidateCardState extends State<CandidateCard> with TickerProviderStateMixin {
+  double _targetPercentage = 0.0;
+
+  late final AnimationController _glowController;
+  late final Animation<double> _glowAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _glowController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+
+    _glowAnimation = Tween<double>(begin: 4.0, end: 12.0).animate(
+      CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
+    );
+
+    if (widget.isResultMode) {
+      _calculateAndAnimate();
+      if (widget.isWinner) {
+        _glowController.repeat(reverse: true);
+      }
+    }
+  }
+
+  @override
+  void didUpdateWidget(CandidateCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.isResultMode && widget.isResultMode) {
+      _calculateAndAnimate();
+      if (widget.isWinner) {
+        _glowController.repeat(reverse: true);
+      }
+    } else if (!widget.isResultMode) {
+      if (mounted) {
+        setState(() { _targetPercentage = 0.0; });
+      }
+      _glowController.stop();
+    } else if (oldWidget.isWinner != widget.isWinner) {
+      if (widget.isWinner) {
+        _glowController.repeat(reverse: true);
+      } else {
+        _glowController.stop();
+        _glowController.reset(); // 애니메이션 값을 초기 상태로 되돌림
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _glowController.dispose();
+    super.dispose();
+  }
+
+  void _calculateAndAnimate() {
+    final double percentage = (widget.voteCount != null && widget.totalVoterCount > 0)
+        ? (widget.voteCount! / widget.totalVoterCount) * widget.columnCount
+        : 0.0;
+
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        setState(() { _targetPercentage = percentage; });
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // [추가] 테두리 결정 로직: 투표 시 '보이게' 옵션이고 선택된 경우 주황색 5.0 두께 표시
-    // 그렇지 않고 결과 창에서 1위(isWinner)인 경우 주황색 4.0 두께 표시
-    BoxBorder? cardBorder;
-    if (isSelected && showSelectionBorder) {
-      cardBorder = Border.all(color: Colors.orange, width: 5.0);
-    } else if (isWinner) {
-      cardBorder = Border.all(color: Colors.orange, width: 4.0);
+    BoxBorder? solidBorder;
+    if (widget.isSelected && widget.showSelectionBorder) {
+      solidBorder = Border.all(color: Colors.orange, width: 5.0);
     }
 
-    return Container(
-      margin: const EdgeInsets.all(12.0),
-      child: Stack(
+    // [핵심 수정] AnimatedBuilder의 builder와 child를 올바르게 사용
+    return AnimatedBuilder(
+      animation: _glowController,
+      // 'child'는 아래에 정의된, 애니메이션과 관련 없는 모든 위젯
+      child: Container(
         clipBehavior: Clip.none,
-        alignment: Alignment.center,
-        children: [
-          // 1. 버튼 본체
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: BoxDecoration(
-              color: backgroundColor,
-              borderRadius: BorderRadius.circular(12.0),
-              border: cardBorder, // 결정된 테두리 적용
-              boxShadow: [
-                if (isSelected && showSelectionBorder)
-                // 선택되었을 때의 강조 효과
-                  BoxShadow(
-                    color: Colors.orange.withOpacity(0.8),
-                    spreadRadius: 5,
-                    blurRadius: 10,
-                  )
-                else if (isWinner)
-                // 결과창 1위일 때의 효과 (기존 유지)
-                  BoxShadow(
-                    color: Colors.orange.withOpacity(0.6),
-                    spreadRadius: 4,
-                    blurRadius: 15,
-                    offset: const Offset(0, 0),
-                  )
-                else
-                // 기본 그림자
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 3,
-                    offset: const Offset(0, 2),
-                  ),
-              ],
-            ),
-            child: InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(12.0),
-              child: Stack(
-                children: [
-                  // 중앙: 후보자 이름
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: AutoSizeText(
-                        name,
-                        style: TextStyle(
-                          fontSize: 80,
-                          fontWeight: FontWeight.bold,
-                          color: fontColor,
-                        ),
-                        maxLines: 1,
-                        minFontSize: 12,
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            // 카드 내용물 (이름)
+            _buildCardContent(),
 
-                  // 우측 상단 내부: 득표수 표시
-                  if (voteCount != null)
-                    Positioned(
-                      top: 10,
-                      right: 15,
-                      child: Text(
-                        "$voteCount표",
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontSize: 25,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
+            // 그래프 바
+            _buildGraphBar(),
 
-          // 2. 후보자 번호 (좌측 상단 바깥쪽)
-          Positioned(
-            left: -10,
-            top: -10,
-            child: Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: Colors.black, width: 2.0),
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 4,
-                    offset: const Offset(1, 1),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Text(
-                  '${index + 1}',
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
+            // 장식 요소 (번호, 득표수, 삭제 버튼)
+            ..._buildDecorations(),
+          ],
+        ),
+      ),
+      builder: (context, child) {
+        // builder는 이제 'child'를 감싸는 Container의 decoration만 책임짐
+        return Container(
+          margin: const EdgeInsets.only(top: 22, left: 12, right: 12, bottom: 12),
+          decoration: BoxDecoration(
+            color: widget.backgroundColor,
+            borderRadius: BorderRadius.circular(12.0),
+            border: solidBorder,
+            boxShadow: [
+              if (widget.isWinner)
+                BoxShadow(
+                  color: Colors.orange.withOpacity(0.8),
+                  spreadRadius: _glowAnimation.value,
+                  blurRadius: _glowAnimation.value * 2,
+                )
+              else if (widget.isSelected && widget.showSelectionBorder)
+                BoxShadow(
+                  color: Colors.orange.withOpacity(0.8),
+                  spreadRadius: 5,
+                  blurRadius: 10,
+                )
+              else
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 3,
+                  offset: const Offset(0, 2),
                 ),
-              ),
-            ),
+            ],
           ),
+          child: child, // [핵심 수정] builder의 파라미터 'child'를 여기에 배치
+        );
+      },
+    );
+  }
 
-          // 3. 삭제 버튼 (X)
-          if (onDelete != null)
-            Positioned(
-              top: 4,
-              right: 4,
-              child: IconButton(
-                icon: const Icon(Icons.close, size: 18),
-                onPressed: onDelete,
-              ),
+  // 나머지 위젯 빌드 함수들은 변경 없음
+  Widget _buildCardContent() {
+    return InkWell(
+      onTap: widget.onTap,
+      borderRadius: BorderRadius.circular(12.0),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: AutoSizeText(
+            widget.name,
+            style: TextStyle(
+              fontSize: 80,
+              fontWeight: FontWeight.bold,
+              color: widget.fontColor,
             ),
-        ],
+            maxLines: 1,
+            minFontSize: 12,
+            textAlign: TextAlign.center,
+          ),
+        ),
       ),
     );
+  }
+
+  Widget _buildGraphBar() {
+    if (!widget.isResultMode) return const SizedBox.shrink();
+
+    return Positioned(
+      top: -10, left: 0, right: 0,
+      child: Container(
+        height: 16,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          color: Colors.black.withOpacity(0.1),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 2000),
+                  curve: Curves.easeOutCubic,
+                  width: (constraints.maxWidth*0.97) * _targetPercentage,
+                  //decoration: BoxDecoration(
+                  //  color: _targetPercentage > 0 ? Colors.orange.withOpacity(1.0) : Colors.transparent,
+                  //),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildDecorations() {
+    return [
+      Positioned(
+        left: -10, top: -10,
+        child: Container(
+          width: 32, height: 32,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: Colors.black, width: 2.0),
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [ BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4, offset: const Offset(1, 1),) ],
+          ),
+          child: Center(child: Text('${widget.index + 1}', style: const TextStyle( color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18, ),),),
+        ),
+      ),
+      if (widget.isResultMode && widget.voteCount != null)
+        Positioned(
+          top: -10, right: -5,
+          child: Container(
+            height: 32,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [ BoxShadow( color: Colors.black.withOpacity(0.2), blurRadius: 3,)],
+            ),
+            child: Center(child: Text("${widget.voteCount}표", style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold,),),),
+          ),
+        ),
+      if (widget.onDelete != null)
+        Positioned(
+          top: 4, right: 4,
+          child: IconButton(icon: const Icon(Icons.close, size: 18), onPressed: widget.onDelete,),
+        ),
+    ];
   }
 }

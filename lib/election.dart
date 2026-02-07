@@ -317,6 +317,9 @@ class _ElectionPageState extends State<ElectionPage> {
   }
 
   Widget _buildColumnWidget(int colIdx, bool isActive) {
+    // [핵심 수정] 현재 컬럼의 후보자 수를 가져옵니다.
+    final int candidateCount = widget.candidateColumns[colIdx].length;
+
     return Container(
       margin: const EdgeInsets.all(8.0),
       padding: const EdgeInsets.all(16.0),
@@ -337,21 +340,26 @@ class _ElectionPageState extends State<ElectionPage> {
           ),
           const Divider(height: 30),
           Expanded(
-            child: CandidateLayout(
-              columnIndex: colIdx,
-              columnCount: widget.columnCount,
-              candidates: widget.candidateColumns[colIdx],
-              backgroundColor: widget.candidateColors[colIdx],
-              fontColor: widget.fontColors[colIdx],
-              isVotingMode: true,
-              selectedCandidateIndex: _selectedCandidateIndices[colIdx],
-              showSelectionBorder: widget.voteDisplayOption.contains('선택 보이게'),
-              onTapCandidate: (candiIdx) {
-                if (widget.voteDisplayOption.contains('터치')) {
-                  _processVote(colIdx, candiIdx);
-                }
-              },
-              onDeleteCandidate: (index) {},
+            // [핵심 수정] 후보자 수에 따라 너비를 조절하는 FractionallySizedBox를 추가합니다.
+            child: FractionallySizedBox(
+              // 후보자가 1명일 때만 너비를 50%로 제한합니다.
+              widthFactor: candidateCount == 1 ? 0.5 : 1.0,
+              child: CandidateLayout(
+                columnIndex: colIdx,
+                columnCount: widget.columnCount,
+                candidates: widget.candidateColumns[colIdx],
+                backgroundColor: widget.candidateColors[colIdx],
+                fontColor: widget.fontColors[colIdx],
+                isVotingMode: true,
+                selectedCandidateIndex: _selectedCandidateIndices[colIdx],
+                showSelectionBorder: widget.voteDisplayOption.contains('선택 보이게'),
+                onTapCandidate: (candiIdx) {
+                  if (widget.voteDisplayOption.contains('터치')) {
+                    _processVote(colIdx, candiIdx);
+                  }
+                },
+                onDeleteCandidate: (index) {},
+              ),
             ),
           ),
         ],
