@@ -214,9 +214,10 @@ class _CandidateCardState extends State<CandidateCard> with TickerProviderStateM
                   duration: const Duration(milliseconds: 2000),
                   curve: Curves.easeOutCubic,
                   width: (constraints.maxWidth*0.97) * _targetPercentage,
-                  //decoration: BoxDecoration(
-                  //  color: _targetPercentage > 0 ? Colors.orange.withOpacity(1.0) : Colors.transparent,
-                  //),
+                  decoration: BoxDecoration(
+                    color: _targetPercentage > 0 ? Colors.orange.withOpacity(1.0) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 );
               },
             ),
@@ -248,11 +249,11 @@ class _CandidateCardState extends State<CandidateCard> with TickerProviderStateM
             height: 32,
             padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.deepOrangeAccent.withOpacity(0.9),
               borderRadius: BorderRadius.circular(8),
               boxShadow: [ BoxShadow( color: Colors.black.withOpacity(0.2), blurRadius: 3,)],
             ),
-            child: Center(child: Text("${widget.voteCount}표", style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold,),),),
+            child: Center(child: Text("${widget.voteCount}표", style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold,),),),
           ),
         ),
       if (widget.onDelete != null)
