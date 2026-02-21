@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart'; // kIsWeb을 사용하기 위해 추가
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 // 위젯 및 유틸리티
@@ -12,7 +12,7 @@ import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:open_file_plus/open_file_plus.dart';
 
-// 웹 전용 다운로드 기능을 위해 dart:html을 import (모바일에서는 무시됨)
+// 웹 전용 다운로드 기능을 위해 dart:html import
 import 'dart:html' as html;
 
 class ResultPage extends StatefulWidget {
@@ -42,23 +42,44 @@ class ResultPage extends StatefulWidget {
 class _ResultPageState extends State<ResultPage> {
   final ScreenshotController _screenshotController = ScreenshotController();
   String? _savedImagePath;
-  bool _isProcessing = false; // [핵심 수정] 중복 클릭 방지를 위한 상태 변수
+  bool _isProcessing = false;
+  late int _totalVoteCount;
 
-  // [핵심 수정] 웹과 모바일 로직을 통합하고, 웹에서는 캡처와 다운로드를 한번에 처리
+
+  @override
+  void initState() {
+    super.initState();
+    _totalVoteCount = widget.voteResults.expand((votes) => votes).fold(0, (sum, item) => sum + item);
+    // 페이지가 로드될 때 콘솔에 득표수를 출력
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      print("\n========================================");
+      print("📊 [Result.dart] 최종 결과 데이터");
+      print("========================================");
+      for (int i = 0; i < widget.columnCount; i++) {
+        print("[${i + 1}단 후보자 득표 현황]");
+        for (int j = 0; j < widget.candidateColumns[i].length; j++) {
+          String name = widget.candidateColumns[i][j].text;
+          int vote = widget.voteResults[i][j];
+          print("- $name : $vote표");
+        }
+        if (i < widget.columnCount - 1) {
+          print("----------------------------------------");
+        }
+      }
+      print("========================================\n");
+    });
+
+  }
+
   Future<void> _captureAndProcess() async {
-    // 중복 실행 방지
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
 
     try {
-      final Uint8List? imageBytes = await _screenshotController.capture(
-          delay: const Duration(milliseconds: 100));
-
+      final Uint8List? imageBytes = await _screenshotController.capture(delay: const Duration(milliseconds: 100));
       if (imageBytes == null) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('이미지 캡처에 실패했습니다.')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('이미지 캡처에 실패했습니다.')));
         return;
       }
 
@@ -66,7 +87,6 @@ class _ResultPageState extends State<ResultPage> {
       final String fileName = '${widget.title}_$timeStamp.png';
 
       if (kIsWeb) {
-        // 웹: 캡처 후 즉시 다운로드 실행
         final blob = html.Blob([imageBytes], 'image/png');
         final url = html.Url.createObjectUrlFromBlob(blob);
         final anchor = html.document.createElement('a') as html.AnchorElement
@@ -79,66 +99,46 @@ class _ResultPageState extends State<ResultPage> {
         html.Url.revokeObjectUrl(url);
 
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('이미지 다운로드가 시작되었습니다.')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('이미지 다운로드가 시작되었습니다.')));
       } else {
-        // 모바일: 갤러리에 저장
         final status = await Permission.storage.request();
         if (!status.isGranted) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('저장 권한이 거부되었습니다.')),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('저장 권한이 거부되었습니다.')));
           return;
         }
 
-        final result = await ImageGallerySaver.saveImage(
-          imageBytes,
-          name: fileName,
-          quality: 95,
-        );
-
+        final result = await ImageGallerySaver.saveImage(imageBytes, name: fileName, quality: 95);
         if (result['isSuccess']) {
           setState(() {
-            _savedImagePath =
-                result['filePath'].toString().replaceFirst('file://', '');
+            _savedImagePath = result['filePath'].toString().replaceFirst('file://', '');
           });
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Text('결과가 갤러리에 저장되었습니다.'),
-              action: SnackBarAction(
-                label: '보기',
-                onPressed: _openSavedImage,
-              ),
+              action: SnackBarAction(label: '보기', onPressed: _openSavedImage),
             ),
           );
         } else {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('이미지 저장에 실패했습니다.')),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('이미지 저장에 실패했습니다.')));
         }
       }
     } finally {
-      // 성공/실패 여부와 관계없이 처리 상태를 false로 변경
-      if (mounted) {
-        setState(() => _isProcessing = false);
-      }
+      if (mounted) setState(() => _isProcessing = false);
     }
   }
 
-  // 모바일에서만 사용하는 파일 열기 함수
   Future<void> _openSavedImage() async {
-    // 웹에서는 이 함수를 직접 호출하지 않음
     if (kIsWeb || _savedImagePath == null) return;
-
     await OpenFile.open(_savedImagePath!);
   }
 
   @override
   Widget build(BuildContext context) {
+    _totalVoteCount = widget.voteResults.expand((votes) => votes).fold(0, (sum, item) => sum + item);
+
     return Screenshot(
       controller: _screenshotController,
       child: Scaffold(
@@ -148,9 +148,7 @@ class _ResultPageState extends State<ResultPage> {
           backgroundColor: Colors.white,
           elevation: 0,
           centerTitle: true,
-          title: Text("${widget.title} 최종 결과",
-              style:
-              const TextStyle(fontWeight: FontWeight.bold, fontSize: 26)),
+          title: Text("${widget.title} 최종 결과", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 26)),
           toolbarHeight: 70,
         ),
         body: _buildBody(),
@@ -162,73 +160,67 @@ class _ResultPageState extends State<ResultPage> {
   Widget _buildBody() {
     return Container(
       color: const Color(0xFFF3F4F6),
-      child: Column(
-        children: [
-          Expanded(
-            child: Row(
-              children: List.generate(widget.columnCount, (colIdx) {
-                return Expanded(child: _buildResultColumnWidget(colIdx));
-              }),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: List.generate(widget.columnCount, (colIdx) {
+          final int candidateCount = widget.candidateColumns[colIdx].length;
 
-  Widget _buildResultColumnWidget(int colIdx) {
-    int voterCountDenominator = 0;
-    if (widget.voteResults.isNotEmpty) {
-      final int totalVoteSum =
-      widget.voteResults.expand((votes) => votes).fold(0, (sum, item) => sum + item);
-      if (widget.columnCount > 1) {
-        voterCountDenominator = totalVoteSum ~/ widget.columnCount;
-      } else {
-        voterCountDenominator = totalVoteSum;
-      }
-    }
-
-    return Container(
-      margin: const EdgeInsets.all(8.0),
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
-      ),
-      child: Column(
-        children: [
-          const SizedBox(height: 25),
-          Text(
-            widget.descriptionColumns[colIdx].map((e) => e.text).join(" "),
-            style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF134686)),
-          ),
-          const Divider(height: 30),
-          Expanded(
-            child: CandidateLayout(
-              columnIndex: colIdx,
-              columnCount: widget.columnCount,
-              candidates: widget.candidateColumns[colIdx],
-              backgroundColor: widget.candidateColors[colIdx],
-              fontColor: widget.fontColors[colIdx],
-              voteResults: widget.voteResults[colIdx],
-              isResultMode: true,
-              isVotingMode: false,
-              totalVoterCount: voterCountDenominator,
-              onTapCandidate: (candiIdx) {},
-              onDeleteCandidate: (index) {},
+          return Expanded(
+            child: Container(
+              margin: const EdgeInsets.all(8.0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+              ),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16.0, 30.0, 16.0, 0),
+                    child: Column(
+                      children: [
+                        Text(
+                          widget.descriptionColumns[colIdx].map((e) => e.text).join(" "),
+                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF134686)),
+                          textAlign: TextAlign.center,
+                        ),
+                        const Divider(height: 30),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: FractionallySizedBox(
+                      // [핵심 수정] 1인 1표제일 경우에만 너비 조절 로직이 적용되도록 수정
+                      widthFactor: widget.columnCount == 1 && candidateCount == 1 ? 0.5 : 1.0,
+                      child: CandidateLayout(
+                        columnIndex: colIdx,
+                        columnCount: widget.columnCount,
+                        candidates: widget.candidateColumns[colIdx],
+                        backgroundColor: widget.candidateColors[colIdx],
+                        fontColor: widget.fontColors[colIdx],
+                        onTapCandidate: (index) {},
+                        onDeleteCandidate: (index) {},
+                        isVotingMode: false,
+                        isResultMode: true,
+                        voteResults: widget.voteResults[colIdx],
+                        totalVoterCount: _totalVoteCount,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          );
+        }),
       ),
     );
   }
 
   Widget _buildResultBottomBar() {
-    int totalVoteCount = widget.voteResults.expand((votes) => votes).fold(0, (sum, item) => sum + item);
+    int voterCount = 0;
+    if (widget.columnCount > 0) {
+      voterCount = _totalVoteCount ~/ widget.columnCount;
+    }
 
     return Container(
       height: 100,
@@ -245,16 +237,26 @@ class _ResultPageState extends State<ResultPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('총 투표 수',
-                  style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey,
-                      fontWeight: FontWeight.bold)),
-              Text('$totalVoteCount 표',
-                  style: const TextStyle(
-                      fontSize: 32,
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold)),
+              Text(
+                widget.columnCount > 1 ? '총 투표자' : '총 투표 수',
+                style: const TextStyle(fontSize: 18, color: Colors.grey, fontWeight: FontWeight.bold),
+              ),
+              if (widget.columnCount > 1)
+                RichText(
+                  text: TextSpan(
+                    style: const TextStyle(fontSize: 22, color: Colors.black, fontWeight: FontWeight.bold),
+                    children: [
+                      TextSpan(text: '$voterCount명, '),
+                      TextSpan(
+                        text: '각 ${voterCount}표씩 ',
+                        style: const TextStyle(color: Colors.blueAccent),
+                      ),
+                      TextSpan(text: '총 $_totalVoteCount표'),
+                    ],
+                  ),
+                )
+              else
+                Text('$_totalVoteCount 표', style: const TextStyle(fontSize: 32, color: Colors.black, fontWeight: FontWeight.bold)),
             ],
           ),
           Row(
@@ -263,76 +265,31 @@ class _ResultPageState extends State<ResultPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('투표 상태',
-                      style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey,
-                          fontWeight: FontWeight.bold)),
-                  Text('투표 완료',
-                      style: TextStyle(
-                          fontSize: 32,
-                          color: Colors.blueAccent,
-                          fontWeight: FontWeight.bold)),
+                  Text('투표 상태', style: TextStyle(fontSize: 18, color: Colors.grey, fontWeight: FontWeight.bold)),
+                  Text('투표 완료', style: TextStyle(fontSize: 32, color: Colors.blueAccent, fontWeight: FontWeight.bold)),
                 ],
               ),
               const SizedBox(width: 20),
-              // [핵심 수정] MouseRegion으로 GestureDetector를 감싸서 커서 변경
               MouseRegion(
-                cursor: SystemMouseCursors.click, // 손가락 모양 커서 지정
+                cursor: SystemMouseCursors.click,
                 child: GestureDetector(
-                  // 모바일: 저장 전/후 기능 변경, 웹: 항상 캡처&다운로드
-                  onTap: (kIsWeb || _savedImagePath == null)
-                      ? _captureAndProcess
-                      : _openSavedImage,
+                  onTap: (_isProcessing) ? null : ((kIsWeb || _savedImagePath == null) ? _captureAndProcess : _openSavedImage),
                   child: Container(
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      // 모바일에서는 저장 후 색상이 바뀌지만, 웹에서는 항상 파란색
-                      color: (_savedImagePath != null && !kIsWeb)
-                          ? Colors.green
-                          : Colors.blueAccent,
+                      color: (_savedImagePath != null && !kIsWeb) ? Colors.green : Colors.blueAccent,
                       borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 4))],
                     ),
-                    child: _isProcessing // 처리 중일 때 로딩 인디케이터 표시
-                        ? const Center(
-                        child: SizedBox(
-                          width: 30,
-                          height: 30,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 3.0,
-                          ),
-                        ))
+                    child: _isProcessing
+                        ? const Center(child: SizedBox(width: 30, height: 30, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3.0)))
                         : Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          (kIsWeb)
-                              ? Icons.download
-                              : (_savedImagePath == null
-                              ? Icons.camera_alt
-                              : Icons.open_in_new),
-                          color: Colors.white,
-                          size: 30,
-                        ),
+                        Icon((kIsWeb) ? Icons.download : (_savedImagePath == null ? Icons.camera_alt : Icons.open_in_new), color: Colors.white, size: 30),
                         const SizedBox(height: 4),
-                        Text(
-                          (kIsWeb)
-                              ? '저장'
-                              : (_savedImagePath == null ? '저장' : '열기'),
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16),
-                        ),
+                        Text((kIsWeb) ? '저장' : (_savedImagePath == null ? '저장' : '열기'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                       ],
                     ),
                   ),

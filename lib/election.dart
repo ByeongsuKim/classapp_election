@@ -317,7 +317,6 @@ class _ElectionPageState extends State<ElectionPage> {
   }
 
   Widget _buildColumnWidget(int colIdx, bool isActive) {
-    // [핵심 수정] 현재 컬럼의 후보자 수를 가져옵니다.
     final int candidateCount = widget.candidateColumns[colIdx].length;
 
     return Container(
@@ -340,10 +339,9 @@ class _ElectionPageState extends State<ElectionPage> {
           ),
           const Divider(height: 30),
           Expanded(
-            // [핵심 수정] 후보자 수에 따라 너비를 조절하는 FractionallySizedBox를 추가합니다.
             child: FractionallySizedBox(
-              // 후보자가 1명일 때만 너비를 50%로 제한합니다.
-              widthFactor: candidateCount == 1 ? 0.5 : 1.0,
+              // [핵심 수정] 1인 1표제일 경우에만 너비 조절 로직이 적용되도록 수정
+              widthFactor: widget.columnCount == 1 && candidateCount == 1 ? 0.5 : 1.0,
               child: CandidateLayout(
                 columnIndex: colIdx,
                 columnCount: widget.columnCount,
@@ -513,3 +511,4 @@ class _ElectionPageState extends State<ElectionPage> {
     );
   }
 }
+
