@@ -144,7 +144,7 @@ class _CandidateCardState extends State<CandidateCard> with TickerProviderStateM
             boxShadow: [
               if (widget.isWinner)
                 BoxShadow(
-                  color: Colors.orange.withOpacity(0.8),
+                  color: Colors.black.withOpacity(0.8),
                   spreadRadius: _glowAnimation.value,
                   blurRadius: _glowAnimation.value * 2,
                 )
@@ -213,7 +213,7 @@ class _CandidateCardState extends State<CandidateCard> with TickerProviderStateM
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 2000),
                   curve: Curves.easeOutCubic,
-                  width: (constraints.maxWidth*0.97) * _targetPercentage,
+                  width: (constraints.maxWidth*0.99) * _targetPercentage,
                   decoration: BoxDecoration(
                     color: _targetPercentage > 0 ? Colors.orange.withOpacity(1.0) : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),

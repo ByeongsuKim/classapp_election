@@ -15,6 +15,7 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:url_launcher/url_launcher.dart';
 import 'election.dart';
 
 void main() {
@@ -34,10 +35,17 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MainPage(),
+      // [핵심 수정 1] 앱의 경로들을 정의합니다.
+      routes: {
+        // '/' 경로는 앱의 가장 첫 화면인 MainPage를 의미합니다.
+        '/': (context) => const MainPage(),
+      },
+      // [핵심 수정 2] 앱이 처음 시작될 때 보여줄 경로를 '/'로 지정합니다.
+      initialRoute: '/',
     );
   }
 }
+
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -83,6 +91,20 @@ class _MainPageState extends State<MainPage> {
   ];
 
   List<Color> _candidateButtonColors = [];
+
+  // [핵심 추가 2] URL을 여는 함수를 만듭니다.
+  void _launchHelpUrl() async {
+    // [핵심 수정] 함수가 호출된 시점에 위젯이 화면에 있는지 확인합니다.
+    if (!mounted) return;
+
+    final Uri url = Uri.parse('https://blog.naver.com/code-ssu/224191491670');
+    if (!await launchUrl(url)) {
+      // 위젯이 화면에 있을 때만 스낵바를 표시합니다.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('웹페이지를 열 수 없습니다.')),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -639,42 +661,93 @@ class _MainPageState extends State<MainPage> {
           Column(
             children: [
               // --- [1번째 줄] 설정 메뉴 영역 (투표제 & 투표 방식) ---
+
+              // [핵심 수정] 기존 Container를 Row로 감싸고 버튼을 추가합니다.
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
-                //padding: const EdgeInsets.only(top: 8.0, left: 24.0, right: 24.0),
                 color: Colors.white,
                 height: 60,
-                child: Center(
-                  child: _isVotingMode
-                      ? Text(
-                    _electionTitleController.text,
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0,
+                child: Row( // Row로 감싸서 제목과 버튼을 나란히 배치
+                  children: [
+                    Expanded( // 제목 영역이 남는 공간을 모두 차지하도록 설정
+                      child: Center(
+                        child: _isVotingMode
+                            ? Text(
+                          _electionTitleController.text,
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0,
+                          ),
+                          textAlign: TextAlign.center,
+                        )
+                            : TextField(
+                          controller: _electionTitleController,
+                          focusNode: _titleFocusNode,
+                          textAlign: TextAlign.center,
+                          cursorWidth: 2,
+                          autofocus: true,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                            isCollapsed: true,
+                          ),
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                      ),
                     ),
-                    textAlign: TextAlign.center,
-                  )
-                      : TextField(
-                    controller: _electionTitleController,
-                    focusNode: _titleFocusNode,
-                    textAlign: TextAlign.center,
-                    cursorWidth: 2,
-                    autofocus: true,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                      isCollapsed: true,
+                    // [핵심 추가 3] 'Q' 버튼을 오른쪽에 추가합니다.
+
+                    Tooltip(
+                      message: '도움말&문의',
+                      waitDuration: const Duration(milliseconds: 500),
+                      child: SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: ElevatedButton(
+                          onPressed: _launchHelpUrl, // 버튼 클릭 시 URL 열기 함수 호출
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8), // 모서리 둥글게
+                            ),
+                            backgroundColor: Colors.white, // 버튼 배경색
+                            //foregroundColor: Colors.black87, // 텍스트 색상
+                            elevation: 1,
+                          ),
+
+                          child: Padding(
+                            padding: const EdgeInsets.all(4.0), // 이미지 주변에 약간의 여백 추가
+                            child: Image.asset(
+                              'assets/images/codebee_logo_favicon.png',
+                              // 이미지 로딩 실패 시 대체 위젯
+                              errorBuilder: (context, error, stackTrace) {
+                                // 에러 시 텍스트 'Q'를 다시 표시
+                                return const Center(
+                                  child: Text(
+                                    'Q',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0,
-                    ),
-                  ),
+                  ],
                 ),
               ),
+
               const Divider(height: 1, color: Color(0xFFE5E7EB)),
 
               // --- [3번째 줄 이하] 후보자 영역 ---

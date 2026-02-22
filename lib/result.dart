@@ -144,7 +144,38 @@ class _ResultPageState extends State<ResultPage> {
       child: Scaffold(
         backgroundColor: const Color(0xFFF3F4F6),
         appBar: AppBar(
-          automaticallyImplyLeading: true,
+          // 자동 뒤로 가기 버튼 비활성화
+          automaticallyImplyLeading: false,
+
+          // [핵심 수정] ElevatedButton을 사용하여 아이콘과 텍스트가 포함된 버튼 생성
+          leading: Center(
+            child: ElevatedButton.icon(
+              onPressed: () {
+                // main.dart를 제외한 모든 이전 페이지를 스택에서 제거하고, main.dart로 이동
+                Navigator.of(context).pushNamedAndRemoveUntil('/', (Route<dynamic> route) => false);
+              },
+              icon: const Icon(Icons.arrow_back, size: 16), // 화살표 아이콘
+              label: const Text(
+                '처음으로',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF3F4F6), // 버튼 배경색
+                foregroundColor: Colors.black87, // 아이콘 및 텍스트 색상
+                elevation: 2, // 살짝 떠 보이는 그림자 효과
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8), // 버튼 모서리를 둥글게
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10), // 내부 여백
+              ),
+            ),
+          ),
+          // leadingWidth를 설정하여 버튼이 잘리지 않도록 공간을 충분히 확보합니다.
+          leadingWidth: 120,
+
           backgroundColor: Colors.white,
           elevation: 0,
           centerTitle: true,
