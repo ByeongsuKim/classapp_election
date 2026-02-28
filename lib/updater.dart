@@ -22,7 +22,7 @@ class AppUpdater {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        String latestTagName = data['tag_name']; // 예: "v1.0.1"
+        String latestTagName = data['v.1.0.3']; // 예: "v1.0.1"
         // 'v' 제거 후 버전 파싱
         Version latestVersion = Version.parse(latestTagName.replaceAll('v', ''));
 

@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'downloader.dart';
+import 'file_saver_util.dart';
 
 // 위젯 및 유틸리티
 import 'package:classapp_election/widgets/candidate_layout.dart';
@@ -14,7 +14,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:open_file_plus/open_file_plus.dart';
 // 이미지 저장 라이브러리 (데스크톱용)
 //import 'package:file_selector/file_selector.dart';
-import 'saver_stub.dart';
+// lib/result.dart 상단 수정
+import 'package:classapp_election/file_saver_util.dart'; // 파일명에 맞춰 수정
 // 웹 전용 다운로드 기능을 위해 dart:html import
 // import 'dart:html' as html;
 
@@ -89,32 +90,13 @@ class _ResultPageState extends State<ResultPage> {
       final String timeStamp = DateFormat('yyMMdd_HHmmss').format(DateTime.now());
       final String fileName = '${widget.title}_$timeStamp.png';
 
-      if (kIsWeb) {
-        downloadImageInWeb(imageBytes, fileName);
-
-        /*
-        final blob = html.Blob([imageBytes], 'image/png');
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        final anchor = html.document.createElement('a') as html.AnchorElement
-          ..href = url
-          ..style.display = 'none'
-          ..download = fileName;
-        html.document.body!.children.add(anchor);
-        anchor.click();
-        html.document.body!.children.remove(anchor);
-        html.Url.revokeObjectUrl(url);
-        */
-
-
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('이미지 다운로드가 시작되었습니다.')));
-      } else if (defaultTargetPlatform == TargetPlatform.windows ||
+      // [수정] 웹과 데스크톱 로직을 통합 함수 하나로 교체합니다.
+      if (kIsWeb || defaultTargetPlatform == TargetPlatform.windows ||
           defaultTargetPlatform == TargetPlatform.linux ||
           defaultTargetPlatform == TargetPlatform.macOS) {
-        // 2. 데스크톱 환경
-        // [핵심] 분리된 함수를 호출합니다. context도 함께 전달합니다.
-        await saveImageInDesktop(context, imageBytes, fileName);
+
+        // 통합된 함수 호출 (함수명이 saveImage인지 saveImageInDesktop인지 util 파일과 맞추세요)
+        await saveImage(context, imageBytes, fileName);
 
       } else {
         final status = await Permission.storage.request();
@@ -212,6 +194,26 @@ class _ResultPageState extends State<ResultPage> {
         children: List.generate(widget.columnCount, (colIdx) {
           final int candidateCount = widget.candidateColumns[colIdx].length;
 
+          // --- [추가] 해당 단(Column)에서 1위 찾기 로직 ---
+          int maxVotes = -1;
+          String winnerName = "";
+          bool isTie = false;
+          int winnerCount = 0;
+
+          for (int j = 0; j < widget.voteResults[colIdx].length; j++) {
+            int currentVotes = widget.voteResults[colIdx][j];
+            if (currentVotes > maxVotes) {
+              maxVotes = currentVotes;
+              winnerName = widget.candidateColumns[colIdx][j].text;
+              winnerCount = 1;
+              isTie = false;
+            } else if (currentVotes == maxVotes && maxVotes > 0) {
+              winnerCount++;
+              isTie = true;
+            }
+          }
+          // ------------------------------------------
+
           return Expanded(
             child: Container(
               margin: const EdgeInsets.all(8.0),
@@ -224,14 +226,62 @@ class _ResultPageState extends State<ResultPage> {
                 children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16.0, 30.0, 16.0, 0),
-                    child: Column(
+                    child: Stack(
+                      clipBehavior: Clip.none, // 컨테이너 밖으로 나가도 잘리지
                       children: [
-                        Text(
-                          widget.descriptionColumns[colIdx].map((e) => e.text).join(" "),
-                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF134686)),
-                          textAlign: TextAlign.center,
+                        // 1. 부제목(설명) 텍스트 - 원래 위치 유지
+                        Column(
+                          children: [
+                            Text(
+                              widget.descriptionColumns[colIdx].map((e) => e.text).join(" "),
+                              style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF134686)
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const Divider(height: 30),
+                          ],
                         ),
-                        const Divider(height: 30),
+                        // --- [추가] 1위 정보 표시 영역 ---
+                        // 2. 1위 정보 표시 영역 - Stack의 Positioned를 사용하여 절대 위치에 배치
+                        if (maxVotes > 0)
+                          Positioned(
+                            top: -15, // 위로 살짝 띄움 (원하는 높이로 조절 가능)
+                            right: 0,  // 우측 상단 끝에 배치
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF134686).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: const Color(0xFF134686).withOpacity(0.3)),
+                              ),
+                              child: Text.rich(
+                                TextSpan(
+                                  children: [
+                                    const TextSpan(
+                                      text: "1위  ",
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey,
+                                          fontWeight: FontWeight.normal
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: isTie ? "$winnerCount명 공동" : winnerName,
+                                      style: const TextStyle(
+                                          fontSize: 14,
+                                          color: Color(0xFF134686),
+                                          fontWeight: FontWeight.bold
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+
                       ],
                     ),
                   ),
@@ -291,7 +341,7 @@ class _ResultPageState extends State<ResultPage> {
               if (widget.columnCount > 1)
                 RichText(
                   text: TextSpan(
-                    style: const TextStyle(fontSize: 22, color: Colors.black, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 22, color: Colors.black, fontWeight: FontWeight.bold,fontFamily: Theme.of(context).textTheme.titleLarge?.fontFamily),
                     children: [
                       TextSpan(text: '$voterCount명, '),
                       TextSpan(

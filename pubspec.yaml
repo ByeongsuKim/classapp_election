@@ -123,6 +123,6 @@ msix_config:
   title: Class Election App
   identity_name: kr.codebee.classapp.election
   publisher: CN=CodeBee # 로컬 테스트용 (인증서가 없을 경우 자동 생성됨)
-  msix_version: 1.0.0.1 # 반드시 4자리 숫자여야 함 (1.0.0.1 등)
+  msix_version: 1.0.0.3 # 반드시 4자리 숫자여야 함 (1.0.0.1 등)
   logo_path: assets/images/favicon.png # 설치 파일 아이콘
   capabilities: "internetClient"  # 필요한 권한

@@ -257,17 +257,38 @@ class _MainPageState extends State<MainPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 20),
-        contentTextStyle: const TextStyle(fontSize: 16),
+        // [수정] 폰트가 적용되지 않는 문제를 해결하기 위해 fontFamily를 추가하거나
+        // 전역 Theme의 텍스트 스타일을 가져와서 복사(copyWith)하여 사용합니다.
+        titleTextStyle: TextStyle(
+          //fontWeight: FontWeight.bold,
+          color: Colors.black,
+          fontSize: 20,
+          // [핵심 추가] 테마의 titleLarge 스타일에 지정된 폰트 패밀리를 가져옵니다.
+          fontFamily: Theme.of(context).textTheme.titleLarge?.fontFamily,
+          // 여기에 사용 중인 폰트명을 적어주세요 (예: 'NanumGothic' 또는 'Pretendard')
+          // 만약 따로 설정한 게 없다면 이 라인을 지우고 아래의 Theme 방식을 권장합니다.
+        ),
+        contentTextStyle: TextStyle(
+          fontSize: 16,
+          color: Colors.black,
+          // Theme.of(context)를 사용하여 앱 전체 폰트를 그대로 가져오는 것이 가장 정확합니다.
+          fontFamily: Theme.of(context).textTheme.bodyMedium?.fontFamily,
+        ),
         title: const Text('투표제 변경'),
         content: const Text('입력된 설명과 후보자 정보가 삭제됩니다. 계속하시겠습니까?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () {
+              // [추가] 클릭 시 현재 포커스를 강제로 해제하여 키보드 이벤트 간섭을 줄입니다.
+              FocusScope.of(context).unfocus();
+              Navigator.of(context).pop();
+            },
             child: const Text('취소'),
           ),
           TextButton(
             onPressed: () {
+              // [추가] 포커스 해제
+              FocusScope.of(context).unfocus();
               Navigator.of(context).pop();
               _clearAllData();
               _updateColumns(newCount, confirm: true);
@@ -340,7 +361,12 @@ class _MainPageState extends State<MainPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 20),
+        titleTextStyle: TextStyle( // const 제거
+          fontWeight: FontWeight.bold,
+          color: Colors.black,
+          fontSize: 20,
+          fontFamily: Theme.of(context).textTheme.titleLarge?.fontFamily,
+        ),
         title: const Text('후보 등록'),
         content: TextField(
           controller: controller,
@@ -400,7 +426,7 @@ class _MainPageState extends State<MainPage> {
             },
             child: const Text('삭제', style: TextStyle(color: Colors.red)),
           ),
-          const Spacer(),
+          // const Spacer(),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('취소'),
@@ -512,7 +538,12 @@ class _MainPageState extends State<MainPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 20),
+        titleTextStyle: TextStyle( // const 제거
+          fontWeight: FontWeight.bold,
+          color: Colors.black,
+          fontSize: 20,
+          fontFamily: Theme.of(context).textTheme.titleLarge?.fontFamily,
+        ),
         title: const Text('설명 수정'),
         content: TextField(
           controller: controller,
@@ -535,7 +566,7 @@ class _MainPageState extends State<MainPage> {
             },
             child: const Text('삭제', style: TextStyle(color: Colors.red)),
           ),
-          const Spacer(),
+          // const Spacer(),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('취소'),
@@ -704,7 +735,7 @@ class _MainPageState extends State<MainPage> {
                         child: _isVotingMode
                             ? Text(
                           _electionTitleController.text,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 0,
