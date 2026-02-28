@@ -6,6 +6,8 @@ import 'package:classapp_election/widgets/candidate_layout.dart';
 import 'package:classapp_election/widgets/vote_setting_bar.dart';
 
 // auto_size_text 패키지 import
+// 윈도우앱에서 창의 제목을 사용자 입력 제목과 등일하게 위한 라이브러리
+import 'package:window_manager/window_manager.dart'; // 추가
 
 // 사용자 기기 판별
 import 'package:flutter/foundation.dart'; // kIsWeb 사용을 위함
@@ -18,7 +20,17 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'election.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 데스크탑일 경우에만 window_manager 초기화
+  if (!kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux ||
+          defaultTargetPlatform == TargetPlatform.macOS)) {
+    await windowManager.ensureInitialized();
+  }
+
   runApp(const MyApp());
 }
 
@@ -123,18 +135,36 @@ class _MainPageState extends State<MainPage> {
       );
     });
     */
+    // [추가] 앱 시작 시 윈도우 창 제목 즉시 설정
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateBrowserTabTitle();
+    });
   }
 
   void _updateBrowserTabTitle() {
     setState(() {
       _electionTitle = _electionTitleController.text;
     });
+
+    // 1. 웹/모바일용 (기존 코드)
     SystemChrome.setApplicationSwitcherDescription(
       ApplicationSwitcherDescription(
         label: _electionTitleController.text,
         primaryColor: Colors.deepPurple.value,
       ),
     );
+
+    // 2. 데스크탑 창 제목 변경 (추가)
+    if (!kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux ||
+            defaultTargetPlatform == TargetPlatform.macOS)) {
+      // 텍스트가 비어있으면 기본 제목, 있으면 입력한 제목으로 설정
+      String newTitle = _electionTitleController.text.isEmpty
+          ? '우리반 반장 뽑기'
+          : _electionTitleController.text;
+      windowManager.setTitle(newTitle);
+    }
   }
 
   void _updateTitleForColumnCount(int count) {

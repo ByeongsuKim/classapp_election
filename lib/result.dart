@@ -1,19 +1,22 @@
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'downloader.dart';
 
 // 위젯 및 유틸리티
 import 'package:classapp_election/widgets/candidate_layout.dart';
 import 'package:intl/intl.dart';
 import 'package:screenshot/screenshot.dart';
 
-// 라이브러리
+// 이미지 저장 라이브러리 (모바일/웹용)
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:open_file_plus/open_file_plus.dart';
-
+// 이미지 저장 라이브러리 (데스크톱용)
+//import 'package:file_selector/file_selector.dart';
+import 'saver_stub.dart';
 // 웹 전용 다운로드 기능을 위해 dart:html import
-import 'dart:html' as html;
+// import 'dart:html' as html;
 
 class ResultPage extends StatefulWidget {
   final String title;
@@ -87,6 +90,9 @@ class _ResultPageState extends State<ResultPage> {
       final String fileName = '${widget.title}_$timeStamp.png';
 
       if (kIsWeb) {
+        downloadImageInWeb(imageBytes, fileName);
+
+        /*
         final blob = html.Blob([imageBytes], 'image/png');
         final url = html.Url.createObjectUrlFromBlob(blob);
         final anchor = html.document.createElement('a') as html.AnchorElement
@@ -97,9 +103,19 @@ class _ResultPageState extends State<ResultPage> {
         anchor.click();
         html.document.body!.children.remove(anchor);
         html.Url.revokeObjectUrl(url);
+        */
+
 
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('이미지 다운로드가 시작되었습니다.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('이미지 다운로드가 시작되었습니다.')));
+      } else if (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux ||
+          defaultTargetPlatform == TargetPlatform.macOS) {
+        // 2. 데스크톱 환경
+        // [핵심] 분리된 함수를 호출합니다. context도 함께 전달합니다.
+        await saveImageInDesktop(context, imageBytes, fileName);
+
       } else {
         final status = await Permission.storage.request();
         if (!status.isGranted) {
@@ -279,7 +295,7 @@ class _ResultPageState extends State<ResultPage> {
                     children: [
                       TextSpan(text: '$voterCount명, '),
                       TextSpan(
-                        text: '각 ${voterCount}표씩 ',
+                        text: '각 ${widget.columnCount}표씩 ',
                         style: const TextStyle(color: Colors.blueAccent),
                       ),
                       TextSpan(text: '총 $_totalVoteCount표'),
