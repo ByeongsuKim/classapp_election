@@ -1,3 +1,10 @@
+
+// 버전 업그레이드를 위해서
+// 1. pubspec.yaml 에서 msix 버전을 올려야 함.
+// 터미널에서
+// 1. flutter clean
+// 2. flutter pub get
+// 4. dart run msix:create
 import 'dart:async';
 import 'dart:math';
 import 'dart:ui';

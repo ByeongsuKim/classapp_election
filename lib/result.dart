@@ -261,7 +261,7 @@ class _ResultPageState extends State<ResultPage> {
                                 TextSpan(
                                   children: [
                                     const TextSpan(
-                                      text: "1위  ",
+                                      text: "최다득표자  ",
                                       style: TextStyle(
                                           fontSize: 12,
                                           color: Colors.grey,

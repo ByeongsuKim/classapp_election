@@ -115,14 +115,29 @@ flutter_launcher_icons:
 
     # 4. 생성될 아이콘의 최대 크기 (윈도우 권장 최대값인 256 설정)
     icon_size: 256
-
-  # MSIX 설치 파일 설정
+# MSIX 설치 파일 설정 (MS 스토어 배포 버전)
+# MSIX 설치 파일 설정 (MS 스토어 배포용 최종 버전)
 msix_config:
-  display_name: 우리반 반장 뽑기  # 설치 후 시작 메뉴에 표시될 이름
-  publisher_display_name: Code.ssu # 제작자 이름
-  title: Class Election App
-  identity_name: kr.codebee.classapp.election
-  publisher: CN=CodeBee # 로컬 테스트용 (인증서가 없을 경우 자동 생성됨)
-  msix_version: 1.0.0.3 # 반드시 4자리 숫자여야 함 (1.0.0.1 등)
-  logo_path: assets/images/favicon.png # 설치 파일 아이콘
-  capabilities: "internetClient"  # 필요한 권한
+  # 1. 스토어에 예약한 앱 이름
+  display_name: 우리반 반장 뽑기
+
+  # 2. 파트너 센터의 'Package/Properties/PublisherDisplayName' 값
+  publisher_display_name: 김병수
+
+  # 3. 파트너 센터의 'Package/Identity/Name' 값 (매우 중요)
+  identity_name: E31C03A5.122195983353
+
+  # 4. 파트너 센터의 'Package/Identity/Publisher' 값 (CN=... 전체)
+  publisher: CN=EEB7ECB6-2169-4351-8683-21FFE866CC4C
+
+  # 5. 스토어 첫 등록 시 버전 (4자리 필수)
+  msix_version: 1.0.0.0
+
+  # 6. 아이콘 경로
+  logo_path: assets/images/favicon.png
+
+  # 7. 필수 권한 및 스토어 설정
+  capabilities: "internetClient"
+  store: true                # 스토어 업로드용 패키지 생성 활성화
+  install: false             # 스토어 배포용은 false
+  languages: "ko-KR"       # 한국어 앱임을 명시
